@@ -4,6 +4,7 @@ using System;
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
+using MongoDB.Bson;
 
 namespace HLNC.Serialization
 {
@@ -59,6 +60,22 @@ namespace HLNC.Serialization
                                                 Subtype = (HLNC.Serialization.VariantSubtype){{property.Value.Subtype}},
                                                 Index = {{property.Value.Index}},
                                                 InterestMask = {{property.Value.InterestMask}},
+                                                {{ if property.Value.NetworkSerializerClass != "" }}
+                                                NetworkSerialize = Callable.From((WorldRunner currentWorld, NetPeer peer, {{property.Value.NetworkSerializerClass}} obj) =>
+                                                {
+                                                    return {{property.Value.NetworkSerializerClass}}.NetworkSerialize(currentWorld, peer, obj) as HLBuffer;
+                                                }),
+                                                NetworkDeserialize = Callable.From((WorldRunner currentWorld, HLBuffer buffer, {{property.Value.NetworkSerializerClass}} obj) =>
+                                                {
+                                                    return {{property.Value.NetworkSerializerClass}}.NetworkDeserialize(currentWorld, buffer, obj);
+                                                }),
+                                                {{ end }}
+                                                {{ if property.Value.BsonSerializerClass != "" }}
+                                                BsonDeserialize = (BsonValue doc) =>
+                                                {
+                                                    return {{property.Value.BsonSerializerClass}}.BsonDeserialize(doc);
+                                                },
+                                                {{ end }}
                                             }
                                         },
                                     {{ end }}

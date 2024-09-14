@@ -180,6 +180,8 @@ namespace HLNC.SourceGenerators
         public byte Index;
         public int Subtype;
         public long InterestMask;
+        public string NetworkSerializerClass;
+        public string BsonSerializerClass;
     }
 
     internal struct CollectedNetworkFunction
@@ -256,11 +258,25 @@ namespace HLNC.SourceGenerators
             // {
             //     propType = VariantType.Dictionary;
             // }
-            // else if (t.IsEnum)
-            // {
-            //     propType = VariantType.Int;
-            //     // var T = t.GetEnumUnderlyingType();
-            // }
+            // Now we identify if t is an enum
+            else if (t.TypeKind == TypeKind.Enum)
+            {
+                propType = VariantType.Int;
+                // var T = t.GetEnumUnderlyingType();
+            }
+            // Check to see if the property is an object
+            else if (t.TypeKind == TypeKind.Class)
+            {
+                propType = VariantType.Object;
+                if (t.ToString() == "HLNC.LazyPeerState")
+                {
+                    subType = VariantSubtype.AsyncPeerValue;
+                }
+                else if (t.ToString() == "HLNC.NetworkNode3D")
+                {
+                    subType = VariantSubtype.NetworkNode;
+                }
+            }
             // else if (t.GetInterfaces()
             //             .Where(i => i.IsGenericType)
             //             .Any(i => i.GetGenericTypeDefinition() == typeof(INetworkSerializable<>))
@@ -466,6 +482,7 @@ namespace HLNC.SourceGenerators
                     {
                         IEnumerable<IPropertySymbol> nodeProperties;
                         IEnumerable<IMethodSymbol> nodeFunctions;
+                        ClassData[] classDatas;
                         if (node.Properties.TryGetValue("script", out var script))
                         {
                             var classPath = sceneClassPaths.FirstOrDefault(p => p.Contains(script));
@@ -474,7 +491,7 @@ namespace HLNC.SourceGenerators
                             {
                                 continue;
                             }
-                            if (sceneClasses.TryGetValue(classPath, out var classDatas))
+                            if (sceneClasses.TryGetValue(classPath, out classDatas))
                             {
                                 // Get all of the properties of the class
                                 nodeProperties = classDatas.SelectMany(c => c.Properties);
@@ -495,9 +512,19 @@ namespace HLNC.SourceGenerators
                         // Now we get all properties from classWithAttribute which have the attribute "NetworkProperty"
                         foreach (var property in nodeProperties)
                         {
+                            var networkSerializerName = "";
+                            var bsonSerializerName = "";
                             var propType = GetVariantType(property.Type);
+                            
+                            if (propType.Type == VariantType.Object) {
+                                networkSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "INetworkSerializable")).ClassSymbol.Name;
+                                bsonSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "IBsonSerializable")).ClassSymbol.Name;
+                            }
+
                             var propertyCollected = new CollectedNetworkProperty
                             {
+                                BsonSerializerClass = bsonSerializerName,
+                                NetworkSerializerClass = networkSerializerName,
                                 NodePath = nodePath,
                                 Name = property.Name,
                                 Type = (int)propType.Type,
