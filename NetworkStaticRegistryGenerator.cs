@@ -8,10 +8,169 @@ using System.Collections.Immutable;
 
 namespace HLNC.SourceGenerators
 {
-    public struct VariantType
+
+    public enum VariantType : long
     {
-        public int Type;
-        public int Subtype;
+        //
+        // Summary:
+        //     Variable is null.
+        Nil,
+        //
+        // Summary:
+        //     Variable is of type System.Boolean.
+        Bool,
+        //
+        // Summary:
+        //     Variable is of type System.Int32.
+        Int,
+        //
+        // Summary:
+        //     Variable is of type System.Single.
+        Float,
+        //
+        // Summary:
+        //     Variable is of type System.String.
+        String,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector2.
+        Vector2,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector2I.
+        Vector2I,
+        //
+        // Summary:
+        //     Variable is of type Godot.Rect2.
+        Rect2,
+        //
+        // Summary:
+        //     Variable is of type Godot.Rect2I.
+        Rect2I,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector3.
+        Vector3,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector3I.
+        Vector3I,
+        //
+        // Summary:
+        //     Variable is of type Godot.Transform2D.
+        Transform2D,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector4.
+        Vector4,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector4I.
+        Vector4I,
+        //
+        // Summary:
+        //     Variable is of type Godot.Plane.
+        Plane,
+        //
+        // Summary:
+        //     Variable is of type Godot.Quaternion.
+        Quaternion,
+        //
+        // Summary:
+        //     Variable is of type Godot.Aabb.
+        Aabb,
+        //
+        // Summary:
+        //     Variable is of type Godot.Basis.
+        Basis,
+        //
+        // Summary:
+        //     Variable is of type Godot.Transform3D.
+        Transform3D,
+        //
+        // Summary:
+        //     Variable is of type Godot.Projection.
+        Projection,
+        //
+        // Summary:
+        //     Variable is of type Godot.Color.
+        Color,
+        //
+        // Summary:
+        //     Variable is of type Godot.StringName.
+        StringName,
+        //
+        // Summary:
+        //     Variable is of type Godot.NodePath.
+        NodePath,
+        //
+        // Summary:
+        //     Variable is of type Godot.Rid.
+        Rid,
+        //
+        // Summary:
+        //     Variable is of type Godot.GodotObject.
+        Object,
+        //
+        // Summary:
+        //     Variable is of type Godot.Callable.
+        Callable,
+        //
+        // Summary:
+        //     Variable is of type Godot.Signal.
+        Signal,
+        //
+        // Summary:
+        //     Variable is of type Godot.Collections.Dictionary.
+        Dictionary,
+        //
+        // Summary:
+        //     Variable is of type Godot.Collections.Array.
+        Array,
+        //
+        // Summary:
+        //     Variable is of type System.Byte[].
+        PackedByteArray,
+        //
+        // Summary:
+        //     Variable is of type System.Int32[].
+        PackedInt32Array,
+        //
+        // Summary:
+        //     Variable is of type System.Int64[].
+        PackedInt64Array,
+        //
+        // Summary:
+        //     Variable is of type System.Single[].
+        PackedFloat32Array,
+        //
+        // Summary:
+        //     Variable is of type System.Double[].
+        PackedFloat64Array,
+        //
+        // Summary:
+        //     Variable is of type System.String[].
+        PackedStringArray,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector2[].
+        PackedVector2Array,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector3[].
+        PackedVector3Array,
+        //
+        // Summary:
+        //     Variable is of type Godot.Color[].
+        PackedColorArray,
+        //
+        // Summary:
+        //     Variable is of type Godot.Vector4[].
+        PackedVector4Array,
+        //
+        // Summary:
+        //     Represents the size of the Godot.VariantType enum.
+        Max
     }
     internal struct CollectedNetworkProperty
     {
@@ -23,198 +182,35 @@ namespace HLNC.SourceGenerators
         public long InterestMask;
     }
 
-    // internal struct CollectedNetworkFunction
-    // {
-    //     public string NodePath;
-    //     public string Name;
-    //     public byte Index;
-    //     public VariantType[] Arguments;
-    //     public bool WithPeer;
-    // }
+    internal struct CollectedNetworkFunction
+    {
+        public string NodePath;
+        public string Name;
+        public byte Index;
+        public ExtendedVariantType[] Arguments;
+        public bool WithPeer;
+    }
+    public enum VariantSubtype
+    {
+        None,
+        Guid,
+        Byte,
+        Int,
+        NetworkId,
+        NetworkNode,
+        AsyncPeerValue
+
+    }
+
+    public struct ExtendedVariantType
+    {
+        public VariantType Type;
+        public VariantSubtype Subtype;
+    }
+
     [Generator]
     public class NetworkStaticRegistryGenerator : ISourceGenerator
     {
-        public enum VariantSubtype
-        {
-            None,
-            Guid,
-            Byte,
-            Int,
-            NetworkId,
-            NetworkNode,
-            AsyncPeerValue
-
-        }
-        public enum VariantType : long
-        {
-            //
-            // Summary:
-            //     Variable is null.
-            Nil,
-            //
-            // Summary:
-            //     Variable is of type System.Boolean.
-            Bool,
-            //
-            // Summary:
-            //     Variable is of type System.Int32.
-            Int,
-            //
-            // Summary:
-            //     Variable is of type System.Single.
-            Float,
-            //
-            // Summary:
-            //     Variable is of type System.String.
-            String,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector2.
-            Vector2,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector2I.
-            Vector2I,
-            //
-            // Summary:
-            //     Variable is of type Godot.Rect2.
-            Rect2,
-            //
-            // Summary:
-            //     Variable is of type Godot.Rect2I.
-            Rect2I,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector3.
-            Vector3,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector3I.
-            Vector3I,
-            //
-            // Summary:
-            //     Variable is of type Godot.Transform2D.
-            Transform2D,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector4.
-            Vector4,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector4I.
-            Vector4I,
-            //
-            // Summary:
-            //     Variable is of type Godot.Plane.
-            Plane,
-            //
-            // Summary:
-            //     Variable is of type Godot.Quaternion.
-            Quaternion,
-            //
-            // Summary:
-            //     Variable is of type Godot.Aabb.
-            Aabb,
-            //
-            // Summary:
-            //     Variable is of type Godot.Basis.
-            Basis,
-            //
-            // Summary:
-            //     Variable is of type Godot.Transform3D.
-            Transform3D,
-            //
-            // Summary:
-            //     Variable is of type Godot.Projection.
-            Projection,
-            //
-            // Summary:
-            //     Variable is of type Godot.Color.
-            Color,
-            //
-            // Summary:
-            //     Variable is of type Godot.StringName.
-            StringName,
-            //
-            // Summary:
-            //     Variable is of type Godot.NodePath.
-            NodePath,
-            //
-            // Summary:
-            //     Variable is of type Godot.Rid.
-            Rid,
-            //
-            // Summary:
-            //     Variable is of type Godot.GodotObject.
-            Object,
-            //
-            // Summary:
-            //     Variable is of type Godot.Callable.
-            Callable,
-            //
-            // Summary:
-            //     Variable is of type Godot.Signal.
-            Signal,
-            //
-            // Summary:
-            //     Variable is of type Godot.Collections.Dictionary.
-            Dictionary,
-            //
-            // Summary:
-            //     Variable is of type Godot.Collections.Array.
-            Array,
-            //
-            // Summary:
-            //     Variable is of type System.Byte[].
-            PackedByteArray,
-            //
-            // Summary:
-            //     Variable is of type System.Int32[].
-            PackedInt32Array,
-            //
-            // Summary:
-            //     Variable is of type System.Int64[].
-            PackedInt64Array,
-            //
-            // Summary:
-            //     Variable is of type System.Single[].
-            PackedFloat32Array,
-            //
-            // Summary:
-            //     Variable is of type System.Double[].
-            PackedFloat64Array,
-            //
-            // Summary:
-            //     Variable is of type System.String[].
-            PackedStringArray,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector2[].
-            PackedVector2Array,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector3[].
-            PackedVector3Array,
-            //
-            // Summary:
-            //     Variable is of type Godot.Color[].
-            PackedColorArray,
-            //
-            // Summary:
-            //     Variable is of type Godot.Vector4[].
-            PackedVector4Array,
-            //
-            // Summary:
-            //     Represents the size of the Godot.VariantType enum.
-            Max
-        }
-
-        public struct ExtendedVariantType
-        {
-            public VariantType Type;
-            public VariantSubtype Subtype;
-        }
-
         public static ExtendedVariantType GetVariantType(ITypeSymbol t)
         {
             VariantType propType = VariantType.Nil;
@@ -317,7 +313,7 @@ namespace HLNC.SourceGenerators
         /// <summary>
         /// A map of every packed scene to a list of paths to its internal network nodes.
         /// </summary>
-        internal static Dictionary<byte, List<Tuple<byte, string>>> StaticNetworkNodesMap = [];
+        internal static Dictionary<string, List<Tuple<byte, string>>> StaticNetworkNodesMap = [];
 
 
         /// <summary>
@@ -325,8 +321,7 @@ namespace HLNC.SourceGenerators
         /// It includes all child Network Nodes within the Scene including itself, but not nested network scenes.
         /// </summary>
         internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>> PropertiesMap = [];
-        // internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>> FUNCTIONS_MAP = [];
-        // internal static Dictionary<string, Dictionary<byte, CollectedNetworkFunction>> FUNCTION_LOOKUP = [];
+        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>> FunctionsMap = [];
         public static IEnumerable<INamedTypeSymbol> GetParentTypes(GeneratorExecutionContext context, ClassDeclarationSyntax type)
         {
             // is there any base type?
@@ -354,20 +349,21 @@ namespace HLNC.SourceGenerators
         {
             public INamedTypeSymbol ClassSymbol;
             public IEnumerable<IPropertySymbol> Properties;
+            public IEnumerable<IMethodSymbol> Functions;
         }
 
-        private long GetInterestMask(IPropertySymbol property)
+        private T GetAttributeArgument<T>(ISymbol sym, string attributeName, string argumentName, T defaultValue)
         {
-            var attribute = property.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "NetworkProperty");
+            var attribute = sym.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == attributeName);
             if (attribute != null)
             {
-                var interestMaskArgument = attribute.NamedArguments.FirstOrDefault(arg => arg.Key == "InterestMask");
+                var interestMaskArgument = attribute.NamedArguments.FirstOrDefault(arg => arg.Key == argumentName);
                 if (interestMaskArgument.Value.Value != null)
                 {
-                    return (long)interestMaskArgument.Value.Value;
+                    return (T)interestMaskArgument.Value.Value;
                 }
             }
-            return 0;
+            return defaultValue;
         }
 
         public void Execute(GeneratorExecutionContext context)
@@ -388,10 +384,14 @@ namespace HLNC.SourceGenerators
                             {
                                 var props = t.GetMembers().Where(m => m.GetAttributes().Any(a => a.AttributeClass != null && a.AttributeClass.Name == "NetworkProperty"))
                                 .OfType<IPropertySymbol>();
+                                // Now get all the functions with the attribute NetworkFunction
+                                var functions = t.GetMembers().Where(m => m.GetAttributes().Any(a => a.AttributeClass != null && a.AttributeClass.Name == "NetworkFunction"))
+                                .OfType<IMethodSymbol>();
                                 return new ClassData
                                 {
                                     ClassSymbol = t,
-                                    Properties = props
+                                    Properties = props,
+                                    Functions = functions
                                 };
                             }).ToArray();
 
@@ -417,6 +417,8 @@ namespace HLNC.SourceGenerators
 
             Dictionary<string, HashSet<string>> networkNodeTree = new Dictionary<string, HashSet<string>>();
 
+            HashSet<string> VisitedClasses = new HashSet<string>();
+
             // Collect all "scenePaths" values from the NetworkScenes attribute
             foreach (var classWithAttribute in classesWithAttribute)
             {
@@ -429,6 +431,11 @@ namespace HLNC.SourceGenerators
                 {
                     continue;
                 }
+                if (VisitedClasses.Contains(targetType.ToString()))
+                {
+                    continue;
+                }
+                VisitedClasses.Add(targetType.ToString());
                 var attribute = targetType.GetAttributes().First(a => a.AttributeClass?.Name == "NetworkScenes");
                 var scenePaths = attribute.ConstructorArguments.First().Values.Select(v => v.Value?.ToString());
                 foreach (var scenePath in scenePaths)
@@ -448,17 +455,17 @@ namespace HLNC.SourceGenerators
                     byte sceneId = (byte)ScenesMap.Count;
                     ScenesMap.Add(sceneId, scenePath);
 
-                    StaticNetworkNodesMap[sceneId] = new List<Tuple<byte, string>>();
+                    StaticNetworkNodesMap[scenePath] = new List<Tuple<byte, string>>();
                     PropertiesMap[scenePath] = new Dictionary<string, Dictionary<string, CollectedNetworkProperty>>();
-                    // FUNCTIONS_MAP[scenePath] = new Dictionary<string, Dictionary<string, CollectedNetworkFunction>>();
-                    // FUNCTION_LOOKUP[scenePath] = new Dictionary<byte, CollectedNetworkFunction>();
+                    FunctionsMap[scenePath] = new Dictionary<string, Dictionary<string, CollectedNetworkFunction>>();
 
                     var propertyId = -1;
-                    // var functionId = -1;
+                    var functionId = -1;
                     byte nodePathId = 0;
                     foreach (var node in parsedTscn.Nodes)
                     {
                         IEnumerable<IPropertySymbol> nodeProperties;
+                        IEnumerable<IMethodSymbol> nodeFunctions;
                         if (node.Properties.TryGetValue("script", out var script))
                         {
                             var classPath = sceneClassPaths.FirstOrDefault(p => p.Contains(script));
@@ -471,6 +478,7 @@ namespace HLNC.SourceGenerators
                             {
                                 // Get all of the properties of the class
                                 nodeProperties = classDatas.SelectMany(c => c.Properties);
+                                nodeFunctions = classDatas.SelectMany(c => c.Functions);
                             }
                             else
                             {
@@ -482,7 +490,7 @@ namespace HLNC.SourceGenerators
                             continue;
                         }
                         var nodePath = node.Parent == null ? "." : node.Parent == "." ? node.Name : $"{node.Parent}/{node.Name}";
-                        StaticNetworkNodesMap[sceneId].Add(new Tuple<byte, string>(nodePathId, nodePath));
+                        StaticNetworkNodesMap[scenePath].Add(new Tuple<byte, string>(nodePathId, nodePath));
                         nodePathId++;
                         // Now we get all properties from classWithAttribute which have the attribute "NetworkProperty"
                         foreach (var property in nodeProperties)
@@ -495,7 +503,7 @@ namespace HLNC.SourceGenerators
                                 Type = (int)propType.Type,
                                 Subtype = (int)propType.Subtype,
                                 Index = (byte)++propertyId,
-                                InterestMask = GetInterestMask(property)
+                                InterestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", 0L)
                             };
                             if (!PropertiesMap[scenePath].ContainsKey(nodePath))
                             {
@@ -503,12 +511,32 @@ namespace HLNC.SourceGenerators
                             }
                             PropertiesMap[scenePath][nodePath].Add(property.Name, propertyCollected);
                         }
+
+                        foreach (var function in nodeFunctions)
+                        {
+                            var withPeer = GetAttributeArgument(function, "NetworkFunction", "WithPeer", false);
+                            var functionCollected = new CollectedNetworkFunction
+                            {
+                                NodePath = nodePath,
+                                Name = function.Name,
+                                Index = (byte)++functionId,
+                                // We skip the first argument, because that is the peer which made the call to the function
+                                // Thus, not a networked argument
+                                Arguments = function.Parameters.Select(p => GetVariantType(p.Type)).Skip(withPeer ? 1 : 0).ToArray(),
+                                WithPeer = withPeer
+                            };
+                            if (!FunctionsMap[scenePath].ContainsKey(nodePath))
+                            {
+                                FunctionsMap[scenePath][nodePath] = new Dictionary<string, CollectedNetworkFunction>();
+                            }
+                            FunctionsMap[scenePath][nodePath].Add(function.Name, functionCollected);
+                        }
                     }
                 }
             }
 
             // Add the source code to the compilation
-            context.AddSource($"NetworkScenesRegister.g.cs", Template.Parse(ReadResource("StaticSourceTemplate.sbncs")).Render(new { ScenesMap = ScenesMap.ToArray(), StaticNetworkNodesMap = StaticNetworkNodesMap.ToArray(), PropertiesMap = PropertiesMap }, member => member.Name));
+            context.AddSource($"NetworkScenesRegister.g.cs", Template.Parse(ReadResource("StaticSourceTemplate.sbncs")).Render(new { ScenesMap = ScenesMap.ToArray(), StaticNetworkNodesMap = StaticNetworkNodesMap.ToArray(), PropertiesMap, FunctionsMap }, member => member.Name));
         }
 
         public void Initialize(GeneratorInitializationContext context)
