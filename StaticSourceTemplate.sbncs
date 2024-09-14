@@ -23,7 +23,7 @@ namespace HLNC.Serialization
         /// <summary>
         /// A map of every packed scene to a list of paths to its internal network nodes.
         /// </summary>
-        internal static Dictionary<byte, Dictionary<byte, string>> STATIC_NETWORK_NODE_PATHS_MAP = new Dictionary<byte, Dictionary<byte, string>>(){
+        private static Dictionary<byte, Dictionary<byte, string>> STATIC_NETWORK_NODE_PATHS_MAP = new Dictionary<byte, Dictionary<byte, string>>(){
             {{ for scene in StaticNetworkNodesMap }}
                 { {{scene.Key}}, new Dictionary<byte, string>(){
                     {{ for node in scene.Value }}
@@ -33,7 +33,17 @@ namespace HLNC.Serialization
             {{ end }}
         };
 
-        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>> PROPERTIES_MAP = new Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>>(){
+        private static Dictionary<string, Dictionary<string, byte>> STATIC_NETWORK_NODE_PATHS_PACK = new Dictionary<string, Dictionary<string, byte>>(){
+            {{ for scene in StaticNetworkNodesMap }}
+                { "{{scene.Value}}", new Dictionary<string, byte>(){
+                    {{ for node in scene.Value }}
+                        { "{{node.Item2}}", {{node.Item1}} },
+                    {{ end }}
+                } },
+            {{ end }}
+        };
+
+        private static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>> PROPERTIES_MAP = new Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>>(){
             {{ for scene in PropertiesMap }}
                 {
                     "{{scene.Key}}", new Dictionary<string, Dictionary<string, CollectedNetworkProperty>>() {
@@ -58,7 +68,23 @@ namespace HLNC.Serialization
                 },
             {{ end }}
         };
-                                    
+
+        private static Dictionary<string, Dictionary<byte, CollectedNetworkProperty>> PROPERTIES_LOOKUP = new Dictionary<string, Dictionary<byte, CollectedNetworkProperty>>(){
+            {{ for scene in PropertiesMap }}
+                {
+                    "{{scene.Key}}", new Dictionary<byte, CollectedNetworkProperty>() {
+                        {{ for node in scene.Value }}
+                            {{ for property in node.Value }}
+                                { {{property.Value.Index}}, PROPERTIES_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{property.Key}}"] },
+                            {{ end }}
+                        {{ end }}
+                    }
+                },
+            {{ end }}
+        };
+
+
+        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>> FUNCTIONS_MAP = [];
 
         private static Dictionary<byte, PackedScene> SCENES_CACHE = [];
 
@@ -71,6 +97,14 @@ namespace HLNC.Serialization
                 SCENES_CACHE[sceneId] = GD.Load<PackedScene>(SCENES_MAP[sceneId]);
             } 
             return SCENES_CACHE[sceneId];
+        }
+
+        public static byte PackProperty(string scene, string node, string property) {
+            return PROPERTIES_MAP[scene][node][property].Index;
+        }
+
+        public static CollectedNetworkProperty UnpackProperty(string scene, byte propertyId) {
+            return PROPERTIES_LOOKUP[scene][propertyId];
         }
     }
 }
