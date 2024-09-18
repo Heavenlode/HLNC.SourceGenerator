@@ -329,7 +329,7 @@ namespace HLNC.SourceGenerators
         /// <summary>
         /// A map of every packed scene to a list of paths to its internal network nodes.
         /// </summary>
-        internal static Dictionary<string, List<Tuple<byte, string>>> StaticNetworkNodesMap = [];
+        internal static Dictionary<string, List<Tuple<int, string>>> StaticNetworkNodesMap = [];
 
 
         /// <summary>
@@ -382,10 +382,16 @@ namespace HLNC.SourceGenerators
             return defaultValue;
         }
 
+        Dictionary<string, CollectedData> SceneDataCache = new Dictionary<string, CollectedData>();
+
         public void Execute(GeneratorExecutionContext context)
         {
+            var projectDir = "";
+            context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.projectdir", out projectDir);
+            projectDir = projectDir.Replace("\\", "/");
             var scenes = context.AdditionalFiles.Where(f => f.Path.EndsWith(".tscn"));
-            Dictionary<string, ClassData[]> sceneClasses = context.Compilation.SyntaxTrees
+            var sceneTextMap = scenes.Select((f, i) => new { Path = f.Path.Replace("\\", "/").Replace(projectDir, ""), Value = f.GetText().ToString() }).ToDictionary(x => x.Path, x => x.Value);
+            Dictionary<string, ClassData[]> networkNodeClasses = context.Compilation.SyntaxTrees
                 .SelectMany(st => st.GetRoot()
                         .DescendantNodes()
                         .Where(n =>
@@ -415,150 +421,34 @@ namespace HLNC.SourceGenerators
                         }))
                         .ToDictionary(x => x.FilePath.Replace("\\", "/"), x => x.Data);
 
-            var sceneClassPaths = sceneClasses.Keys.ToImmutableHashSet();
+            var sceneClassPaths = networkNodeClasses.Keys.ToImmutableHashSet();
             // Pretty print the scene classes
-            foreach (var sceneClass in sceneClasses)
-            {
-                Debug.WriteLine($"Scene class: {sceneClass.Key}, {sceneClass.Value}");
-            }
-
-            var classesWithAttribute = context.Compilation.SyntaxTrees
-                .SelectMany(st => st.GetRoot()
-                        .DescendantNodes()
-                        .Where(n => n is ClassDeclarationSyntax)
-                        .Select(n => n as ClassDeclarationSyntax)
-                        .Where(r => r != null && r.AttributeLists
-                            .SelectMany(al => al.Attributes)
-                            .Any(a => a.Name.GetText().ToString() == "NetworkScenes")));
+            // foreach (var sceneClass in sceneClasses)
+            // {
+            //     Debug.WriteLine($"Scene class: {sceneClass.Key}, {sceneClass.Value}");
+            // }
 
             Dictionary<string, HashSet<string>> networkNodeTree = new Dictionary<string, HashSet<string>>();
 
-            HashSet<string> VisitedClasses = new HashSet<string>();
+            // Now we iterate and parse every scene
+
 
             // Collect all "scenePaths" values from the NetworkScenes attribute
-            foreach (var classWithAttribute in classesWithAttribute)
+            foreach (var sceneFile in scenes)
             {
-                if (classWithAttribute == null)
+                var sceneResourcePath = sceneFile.Path.Replace("\\", "/").Replace(projectDir, "res://");
+                var result = CollectSceneData(sceneResourcePath, sceneFile.GetText()?.ToString(), networkNodeClasses, sceneClassPaths, sceneTextMap);
+                if (result.StaticNetworkNodes.Count > 0)
                 {
-                    continue;
+                    StaticNetworkNodesMap[sceneResourcePath] = result.StaticNetworkNodes;
                 }
-                var targetType = ModelExtensions.GetDeclaredSymbol(context.Compilation.GetSemanticModel(classWithAttribute.SyntaxTree), classWithAttribute) as INamedTypeSymbol;
-                if (targetType == null)
+                if (result.Properties.Count > 0)
                 {
-                    continue;
+                    PropertiesMap[sceneResourcePath] = result.Properties;
                 }
-                if (VisitedClasses.Contains(targetType.ToString()))
+                if (result.Functions.Count > 0)
                 {
-                    continue;
-                }
-                VisitedClasses.Add(targetType.ToString());
-                var attribute = targetType.GetAttributes().First(a => a.AttributeClass?.Name == "NetworkScenes");
-                var scenePaths = attribute.ConstructorArguments.First().Values.Select(v => v.Value?.ToString());
-                foreach (var scenePath in scenePaths)
-                {
-                    if (scenePath == null)
-                    {
-                        continue;
-                    }
-                    var sceneFile = scenes.FirstOrDefault(f => f.Path.Contains(scenePath.Replace("res://", "").Replace("/", "\\")));
-                    Debug.WriteLine(scenePath);
-                    if (sceneFile == null)
-                    {
-                        throw new System.Exception($"Scene file not found: {scenePath}");
-                    }
-                    var parser = new ConfigParser();
-                    var parsedTscn = parser.ParseTscnFile(sceneFile.GetText()?.ToString() ?? "");
-                    byte sceneId = (byte)ScenesMap.Count;
-                    ScenesMap.Add(sceneId, scenePath);
-
-                    StaticNetworkNodesMap[scenePath] = new List<Tuple<byte, string>>();
-                    PropertiesMap[scenePath] = new Dictionary<string, Dictionary<string, CollectedNetworkProperty>>();
-                    FunctionsMap[scenePath] = new Dictionary<string, Dictionary<string, CollectedNetworkFunction>>();
-
-                    var propertyId = -1;
-                    var functionId = -1;
-                    byte nodePathId = 0;
-                    foreach (var node in parsedTscn.Nodes)
-                    {
-                        IEnumerable<IPropertySymbol> nodeProperties;
-                        IEnumerable<IMethodSymbol> nodeFunctions;
-                        ClassData[] classDatas;
-                        if (node.Properties.TryGetValue("script", out var script))
-                        {
-                            var classPath = sceneClassPaths.FirstOrDefault(p => p.Contains(script));
-                            Debug.WriteLine($"CLASS: {classPath}, script: {script}");
-                            if (string.IsNullOrEmpty(classPath))
-                            {
-                                continue;
-                            }
-                            if (sceneClasses.TryGetValue(classPath, out classDatas))
-                            {
-                                // Get all of the properties of the class
-                                nodeProperties = classDatas.SelectMany(c => c.Properties);
-                                nodeFunctions = classDatas.SelectMany(c => c.Functions);
-                            }
-                            else
-                            {
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            continue;
-                        }
-                        var nodePath = node.Parent == null ? "." : node.Parent == "." ? node.Name : $"{node.Parent}/{node.Name}";
-                        StaticNetworkNodesMap[scenePath].Add(new Tuple<byte, string>(nodePathId, nodePath));
-                        nodePathId++;
-                        // Now we get all properties from classWithAttribute which have the attribute "NetworkProperty"
-                        foreach (var property in nodeProperties)
-                        {
-                            var networkSerializerName = "";
-                            var bsonSerializerName = "";
-                            var propType = GetVariantType(property.Type);
-                            
-                            if (propType.Type == VariantType.Object) {
-                                networkSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "INetworkSerializable")).ClassSymbol.Name;
-                                bsonSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "IBsonSerializable")).ClassSymbol.Name;
-                            }
-
-                            var propertyCollected = new CollectedNetworkProperty
-                            {
-                                BsonSerializerClass = bsonSerializerName,
-                                NetworkSerializerClass = networkSerializerName,
-                                NodePath = nodePath,
-                                Name = property.Name,
-                                Type = (int)propType.Type,
-                                Subtype = (int)propType.Subtype,
-                                Index = (byte)++propertyId,
-                                InterestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", 0L)
-                            };
-                            if (!PropertiesMap[scenePath].ContainsKey(nodePath))
-                            {
-                                PropertiesMap[scenePath][nodePath] = new Dictionary<string, CollectedNetworkProperty>();
-                            }
-                            PropertiesMap[scenePath][nodePath].Add(property.Name, propertyCollected);
-                        }
-
-                        foreach (var function in nodeFunctions)
-                        {
-                            var withPeer = GetAttributeArgument(function, "NetworkFunction", "WithPeer", false);
-                            var functionCollected = new CollectedNetworkFunction
-                            {
-                                NodePath = nodePath,
-                                Name = function.Name,
-                                Index = (byte)++functionId,
-                                // We skip the first argument, because that is the peer which made the call to the function
-                                // Thus, not a networked argument
-                                Arguments = function.Parameters.Select(p => GetVariantType(p.Type)).Skip(withPeer ? 1 : 0).ToArray(),
-                                WithPeer = withPeer
-                            };
-                            if (!FunctionsMap[scenePath].ContainsKey(nodePath))
-                            {
-                                FunctionsMap[scenePath][nodePath] = new Dictionary<string, CollectedNetworkFunction>();
-                            }
-                            FunctionsMap[scenePath][nodePath].Add(function.Name, functionCollected);
-                        }
-                    }
+                    FunctionsMap[sceneResourcePath] = result.Functions;
                 }
             }
 
@@ -566,14 +456,174 @@ namespace HLNC.SourceGenerators
             context.AddSource($"NetworkScenesRegister.g.cs", Template.Parse(ReadResource("StaticSourceTemplate.sbncs")).Render(new { ScenesMap = ScenesMap.ToArray(), StaticNetworkNodesMap = StaticNetworkNodesMap.ToArray(), PropertiesMap, FunctionsMap }, member => member.Name));
         }
 
+
+        struct CollectedData
+        {
+            public Dictionary<string, Dictionary<string, CollectedNetworkProperty>> Properties;
+            public Dictionary<string, Dictionary<string, CollectedNetworkFunction>> Functions;
+            public List<Tuple<int, string>> StaticNetworkNodes;
+            public bool IsNetworkScene;
+        }
+
+        private CollectedData CollectSceneData(string sceneResourcePath, string sceneFileContent, Dictionary<string, ClassData[]> networkNodeClasses, ImmutableHashSet<string> sceneClassPaths, Dictionary<string, string> sceneTextMap)
+        {
+            if (SceneDataCache.TryGetValue(sceneResourcePath, out var cachedData))
+            {
+                return cachedData;
+            }
+            CollectedData result = new CollectedData
+            {
+                Properties = new Dictionary<string, Dictionary<string, CollectedNetworkProperty>>(),
+                Functions = new Dictionary<string, Dictionary<string, CollectedNetworkFunction>>(),
+                StaticNetworkNodes = new List<Tuple<int, string>>(),
+                IsNetworkScene = false
+            };
+            var parser = new ConfigParser();
+            var parsedTscn = parser.ParseTscnFile(sceneFileContent ?? "");
+            string rootScript = "";
+            SceneDataCache[sceneResourcePath] = result;
+            if (parsedTscn.RootNode == null || !parsedTscn.RootNode.Properties.TryGetValue("script", out rootScript)) return result;
+            // Get the networkNodeClass of the parsed scene
+            var networkNodeClass = networkNodeClasses.Keys.FirstOrDefault(k => k.Contains(rootScript));
+            if (!string.IsNullOrEmpty(networkNodeClass))
+            {
+                result.IsNetworkScene = true;
+                byte sceneId = (byte)ScenesMap.Count;
+                ScenesMap.Add(sceneId, sceneResourcePath);
+            }
+
+            var nodePathId = 0;
+            var functionId = 0;
+            var propertyId = 0;
+
+            foreach (var node in parsedTscn.Nodes)
+            {
+                IEnumerable<IPropertySymbol> nodeProperties;
+                IEnumerable<IMethodSymbol> nodeFunctions;
+                ClassData[] classDatas;
+                var nodePath = node.Parent == null ? "." : node.Parent == "." ? node.Name : $"{node.Parent}/{node.Name}";
+
+                // The node is a NetworkNode3D
+                if (node.Properties.TryGetValue("script", out var script))
+                {
+                    var classPath = sceneClassPaths.FirstOrDefault(p => p.Contains(script));
+                    Debug.WriteLine($"CLASS: {classPath}, script: {script}");
+                    if (string.IsNullOrEmpty(classPath))
+                    {
+                        continue;
+                    }
+                    if (networkNodeClasses.TryGetValue(classPath, out classDatas))
+                    {
+                        // Get all of the properties of the class
+                        nodeProperties = classDatas.SelectMany(c => c.Properties);
+                        nodeFunctions = classDatas.SelectMany(c => c.Functions);
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+                // The node is a scene that we want to recurse through
+                else if (node.Instance != null)
+                {
+                    var recurseData = CollectSceneData($"res://{node.Instance}", sceneTextMap[node.Instance], networkNodeClasses, sceneClassPaths, sceneTextMap);
+                    if (recurseData.IsNetworkScene)
+                    {
+                        continue;
+                    }
+                    foreach (var nodePathTuple in recurseData.StaticNetworkNodes)
+                    {
+                        result.StaticNetworkNodes.Add(new Tuple<int, string>(nodePathId++, nodePath + "/" + nodePathTuple.Item2));
+                    }
+                    foreach (var kvp in recurseData.Properties)
+                    {
+                        foreach (var prop in kvp.Value)
+                        {
+                            var val = prop.Value;
+                            val.Index = (byte)propertyId++;
+                            kvp.Value[prop.Key] = val;
+                        }
+                        result.Properties[kvp.Key] = kvp.Value;
+                    }
+                    foreach (var kvp in recurseData.Functions)
+                    {
+                        result.Functions[kvp.Key] = kvp.Value;
+                    }
+                    continue;
+                }
+                else
+                {
+                    // It's just a normal node, so we skip. Nested nodes are included as part of the parent scene, thus will be reached eventually in the loop.
+                    continue;
+                }
+                result.StaticNetworkNodes.Add(new Tuple<int, string>(nodePathId++, nodePath));
+                // Now we get all properties from classWithAttribute which have the attribute "NetworkProperty"
+                foreach (var property in nodeProperties)
+                {
+                    var networkSerializerName = "";
+                    var bsonSerializerName = "";
+                    var propType = GetVariantType(property.Type);
+
+                    if (propType.Type == VariantType.Object)
+                    {
+                        networkSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "INetworkSerializable")).ClassSymbol.Name;
+                        bsonSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "IBsonSerializable")).ClassSymbol.Name;
+                    }
+
+                    var propertyCollected = new CollectedNetworkProperty
+                    {
+                        BsonSerializerClass = bsonSerializerName,
+                        NetworkSerializerClass = networkSerializerName,
+                        NodePath = nodePath,
+                        Name = property.Name,
+                        Type = (int)propType.Type,
+                        Subtype = (int)propType.Subtype,
+                        Index = (byte)propertyId++,
+                        InterestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", 0L)
+                    };
+                    if (!result.Properties.ContainsKey(nodePath))
+                    {
+                        result.Properties[nodePath] = new Dictionary<string, CollectedNetworkProperty>();
+                    }
+                    result.Properties[nodePath].Add(property.Name, propertyCollected);
+                }
+
+                foreach (var function in nodeFunctions)
+                {
+                    var withPeer = GetAttributeArgument(function, "NetworkFunction", "WithPeer", false);
+                    var functionCollected = new CollectedNetworkFunction
+                    {
+                        NodePath = nodePath,
+                        Name = function.Name,
+                        Index = (byte)functionId++,
+                        // We skip the first argument, because that is the peer which made the call to the function
+                        // Thus, not a networked argument
+                        Arguments = function.Parameters.Select(p => GetVariantType(p.Type)).Skip(withPeer ? 1 : 0).ToArray(),
+                        WithPeer = withPeer
+                    };
+                    if (!result.Functions.ContainsKey(nodePath))
+                    {
+                        result.Functions[nodePath] = new Dictionary<string, CollectedNetworkFunction>();
+                    }
+                    result.Functions[nodePath].Add(function.Name, functionCollected);
+                }
+            }
+
+            return result;
+        }
+
         public void Initialize(GeneratorInitializationContext context)
         {
-            // No initialization required for this one
+            PropertiesMap.Clear();
+            FunctionsMap.Clear();
+            StaticNetworkNodesMap.Clear();
+            ScenesMap.Clear();
+            SceneDataCache.Clear();
 #if DEBUG
-            // if (!Debugger.IsAttached)
-            // {
-            //     Debugger.Launch();
-            // }
+            //if (!Debugger.IsAttached)
+            //{
+            //   Debugger.Launch();
+            //}
 #endif
         }
     }

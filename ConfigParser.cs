@@ -37,6 +37,7 @@ namespace HLNC.SourceGenerators
 
             #nullable enable
             public string? Parent { get; set; }
+            public string? Instance { get; set; }
             #nullable disable
             public Dictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
         }
@@ -47,6 +48,7 @@ namespace HLNC.SourceGenerators
             public List<ExtResource> ExtResources { get; set; } = new List<ExtResource>();
             public List<SubResource> SubResources { get; set; } = new List<SubResource>();
             public List<Node> Nodes { get; set; } = new List<Node>();
+            public Node RootNode { get; set; }
         }
 
         public ParsedTscn ParseTscnFile(string fileText)
@@ -76,6 +78,9 @@ namespace HLNC.SourceGenerators
                 {
                     currentNode = ParseNode(line);
                     parsedTscn.Nodes.Add(currentNode);
+                    if (currentNode.Parent == null) {
+                        parsedTscn.RootNode = currentNode;
+                    }
                     currentSubResource = null;
                 }
                 else if (currentSubResource != null && line.Contains("="))
@@ -114,11 +119,11 @@ namespace HLNC.SourceGenerators
             {
                 if (part.StartsWith("load_steps="))
                 {
-                    gdScene.LoadSteps = int.Parse(part.Split('=')[1]);
+                    gdScene.LoadSteps = int.Parse(part.Split('=')[1].Trim('"', ']'));
                 }
                 else if (part.StartsWith("format="))
                 {
-                    gdScene.Format = int.Parse(part.Split('=')[1]);
+                    gdScene.Format = int.Parse(part.Split('=')[1].Trim('"', ']'));
                 }
                 else if (part.StartsWith("uid="))
                 {
@@ -144,7 +149,12 @@ namespace HLNC.SourceGenerators
                 }
                 else if (part.StartsWith("id="))
                 {
-                    extResource.Id = part.Split('=')[1].Trim('"', ']');
+                    var regex = new Regex(@"id=""?([^""]+)""?");
+                    var match = regex.Match(part);
+                    if (match.Success)
+                    {
+                        extResource.Id = match.Groups[1].Value;
+                    }
                 }
             }
             resourceToPathMap[extResource.Id] = extResource.Path.Replace("res://", "");
@@ -186,6 +196,19 @@ namespace HLNC.SourceGenerators
                 else if (part.StartsWith("parent="))
                 {
                     node.Parent = part.Split('=')[1].Trim('"', ']');
+                } else if (part.StartsWith("instance="))
+                {
+                    var inst = part.Split('=')[1].Trim('"', ']');
+                    var regex = new Regex(@"ExtResource\(""([^']+)""\)");
+                    var match = regex.Match(inst);
+                    if (match.Success)
+                    {
+                        var resourceId = match.Groups[1].Value;
+                        inst = resourceToPathMap[resourceId];
+                        if (!inst.EndsWith(".tscn")) continue;
+                        Debug.WriteLine($"Found instance: {inst}");
+                        node.Instance = inst;
+                    }
                 }
             }
             return node;
