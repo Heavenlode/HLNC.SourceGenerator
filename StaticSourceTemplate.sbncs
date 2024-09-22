@@ -121,11 +121,11 @@ namespace HLNC.Serialization
             {{ end }}
         };
 
-        private static Dictionary<string, Dictionary<byte, CollectedNetworkFunction>> FUNCTIONS_LOOKUP = new Dictionary<string, Dictionary<byte, CollectedNetworkFunction>>(){
+        private static Dictionary<string, Dictionary<int, CollectedNetworkFunction>> FUNCTIONS_LOOKUP = new Dictionary<string, Dictionary<int, CollectedNetworkFunction>>(){
             {{ for scene in FunctionsMap }}
                 {{ i = 0 }}
                 {
-                    "{{scene.Key}}", new Dictionary<byte, CollectedNetworkFunction>() {
+                    "{{scene.Key}}", new Dictionary<int, CollectedNetworkFunction>() {
                         {{ for node in scene.Value }}
                             {{ for function in node.Value }}
                                 { {{i++}}, FUNCTIONS_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{function.Key}}"] },
@@ -136,11 +136,11 @@ namespace HLNC.Serialization
             {{ end }}
         };
 
-        private static Dictionary<string, Dictionary<byte, CollectedNetworkProperty>> PROPERTIES_LOOKUP = new Dictionary<string, Dictionary<byte, CollectedNetworkProperty>>(){
+        private static Dictionary<string, Dictionary<int, CollectedNetworkProperty>> PROPERTIES_LOOKUP = new Dictionary<string, Dictionary<int, CollectedNetworkProperty>>(){
             {{ for scene in PropertiesMap }}
                 {{ i = 0 }}
                 {
-                    "{{scene.Key}}", new Dictionary<byte, CollectedNetworkProperty>() {
+                    "{{scene.Key}}", new Dictionary<int, CollectedNetworkProperty>() {
                         {{ for node in scene.Value }}
                             {{ for property in node.Value }}
                                 { {{i++}}, PROPERTIES_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{property.Key}}"] },

@@ -217,7 +217,7 @@ namespace HLNC.SourceGenerators
             foreach (var sceneFile in scenes)
             {
                 var sceneResourcePath = sceneFile.Path.Replace("\\", "/").Replace(projectDir, "res://");
-                var result = CollectSceneData(sceneResourcePath, sceneFile.GetText()?.ToString(), sceneTextMap);
+                var result = CollectSceneData(context, sceneResourcePath, sceneFile.GetText()?.ToString(), sceneTextMap);
                 if (!result.IsNetworkScene) continue;
                 if (result.StaticNetworkNodes.Count > 0)
                 {
@@ -258,7 +258,7 @@ namespace HLNC.SourceGenerators
         }
 
         // Method to collect scene data
-        private CollectedData CollectSceneData(string sceneResourcePath, string sceneFileContent, Dictionary<string, string> sceneTextMap)
+        private CollectedData CollectSceneData(GeneratorExecutionContext context, string sceneResourcePath, string sceneFileContent, Dictionary<string, string> sceneTextMap)
         {
             if (SceneDataCache.TryGetValue(sceneResourcePath, out var cachedData))
             {
@@ -316,7 +316,7 @@ namespace HLNC.SourceGenerators
                 // This means the node is a scene instance, and we need to recurse into the scene to collect the data
                 else if (node.Instance != null)
                 {
-                    var recurseData = CollectSceneData($"res://{node.Instance}", sceneTextMap[node.Instance], sceneTextMap);
+                    var recurseData = CollectSceneData(context, $"res://{node.Instance}", sceneTextMap[node.Instance], sceneTextMap);
 
                     // NetworkScene nodes exist within their own "root network context" so we do not flatten them into this current scene's data
                     if (recurseData.IsNetworkScene) continue;
@@ -359,8 +359,14 @@ namespace HLNC.SourceGenerators
                     if (propType.Type == VariantType.Object)
                     {
                         // If the property is an object, we check if they define custom serializers, and if so then we find the class name which implements them
-                        networkSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "INetworkSerializable")).ClassSymbol.Name;
-                        bsonSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "IBsonSerializable")).ClassSymbol.Name;
+                        // We get the ClassSymbol of the property, and determine if it implements the INetworkSerializable or IBsonSerializable interfaces
+                        var propertyParentTypes = property.Type.DeclaringSyntaxReferences
+                            .Select(syntaxRef => syntaxRef.GetSyntax() as ClassDeclarationSyntax)
+                            .Where(syntax => syntax != null)
+                            .SelectMany(syntax => GetParentTypes(context, syntax));
+
+                        networkSerializerName = propertyParentTypes.FirstOrDefault(t => t.Interfaces.Any(i => i.Name == "INetworkSerializable"))?.Name;
+                        bsonSerializerName = propertyParentTypes.FirstOrDefault(t => t.Interfaces.Any(i => i.Name == "IBsonSerializable"))?.Name;
                     }
 
 
