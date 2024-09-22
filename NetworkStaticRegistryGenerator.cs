@@ -250,21 +250,20 @@ namespace HLNC.SourceGenerators
             {
                 propType = VariantType.Bool;
             }
-            else if (t.SpecialType.ToString() == "System_Byte[]")
+            else if (t.ToString() == "byte[]")
             {
                 propType = VariantType.PackedByteArray;
             }
-            // else if (t.IsGenericType && t.GetGenericTypeDefinition().ToString() == "System.Collections.Generic.Dictionary`2")
-            // {
-            //     propType = VariantType.Dictionary;
-            // }
+            else if (t.ToString().StartsWith("Godot.Collections.Dictionary"))
+            {
+                propType = VariantType.Dictionary;
+            }
             // Now we identify if t is an enum
             else if (t.TypeKind == TypeKind.Enum)
             {
                 propType = VariantType.Int;
                 // var T = t.GetEnumUnderlyingType();
             }
-            // Check to see if the property is an object
             else if (t.TypeKind == TypeKind.Class)
             {
                 propType = VariantType.Object;
@@ -277,29 +276,20 @@ namespace HLNC.SourceGenerators
                     subType = VariantSubtype.NetworkNode;
                 }
             }
-            // else if (t.GetInterfaces()
-            //             .Where(i => i.IsGenericType)
-            //             .Any(i => i.GetGenericTypeDefinition() == typeof(INetworkSerializable<>))
-            //         )
-            // {
-            //     propType = VariantType.Object;
-            //     if (t == typeof(LazyPeerState))
-            //     {
-            //         subType = VariantSubtype.AsyncPeerValue;
-            //     }
-            //     else if (t == typeof(NetworkNode3D))
-            //     {
-            //         subType = VariantSubtype.NetworkNode;
-            //     }
-            // }
-            // else
-            // {
-            //     return new VariantType
-            //     {
-            //         Type = VariantType.Nil,
-            //         Subtype = VariantSubtype.None
-            //     };
-            // }
+            else if (t.TypeKind == TypeKind.Interface)
+            {
+                propType = VariantType.Object;
+                if (t.ToString() == "HLNC.LazyPeerState")
+                {
+                    subType = VariantSubtype.AsyncPeerValue;
+                }
+                else if (t.ToString() == "HLNC.NetworkNode3D")
+                {
+                    subType = VariantSubtype.NetworkNode;
+                }
+            } else {
+                Debug.WriteLine($"Unknown type: {t} with kind {t.TypeKind} and special type {t.SpecialType}");
+            }
 
             return new ExtendedVariantType
             {
@@ -378,6 +368,23 @@ namespace HLNC.SourceGenerators
                 {
                     return (T)interestMaskArgument.Value.Value;
                 }
+                // Check to see if "argumentName" is a field of the attribute with a default value
+                // var field = attribute.AttributeClass.GetMembers().FirstOrDefault(m => m.Name == argumentName);
+                // if (field != null)
+                // {
+                //     var equalsSyntax = field.DeclaringSyntaxReferences[0].GetSyntax() switch
+                //     {
+                //         PropertyDeclarationSyntax property => property.Initializer,
+                //         VariableDeclaratorSyntax variable => variable.Initializer,
+                //         _ => throw new Exception("Unknown declaration syntax")
+                //     };
+
+                //     // If the property/field has an initializer
+                //     if (equalsSyntax is not null)
+                //     {
+                //         return equalsSyntax.Value.ToString();
+                //     }
+                // }
             }
             return defaultValue;
         }
@@ -481,7 +488,6 @@ namespace HLNC.SourceGenerators
             var parser = new ConfigParser();
             var parsedTscn = parser.ParseTscnFile(sceneFileContent ?? "");
             string rootScript = "";
-            SceneDataCache[sceneResourcePath] = result;
             if (parsedTscn.RootNode == null || !parsedTscn.RootNode.Properties.TryGetValue("script", out rootScript)) return result;
             // Get the networkNodeClass of the parsed scene
             var networkNodeClass = networkNodeClasses.Keys.FirstOrDefault(k => k.Contains(rootScript));
@@ -543,11 +549,11 @@ namespace HLNC.SourceGenerators
                             val.Index = (byte)propertyId++;
                             kvp.Value[prop.Key] = val;
                         }
-                        result.Properties[kvp.Key] = kvp.Value;
+                        result.Properties[nodePath + "/" + kvp.Key] = kvp.Value;
                     }
                     foreach (var kvp in recurseData.Functions)
                     {
-                        result.Functions[kvp.Key] = kvp.Value;
+                        result.Functions[nodePath + "/" + kvp.Key] = kvp.Value;
                     }
                     continue;
                 }
@@ -563,6 +569,7 @@ namespace HLNC.SourceGenerators
                     var networkSerializerName = "";
                     var bsonSerializerName = "";
                     var propType = GetVariantType(property.Type);
+                    propType.Subtype = GetAttributeArgument(property, "NetworkProperty", "Subtype", propType.Subtype);
 
                     if (propType.Type == VariantType.Object)
                     {
@@ -579,7 +586,8 @@ namespace HLNC.SourceGenerators
                         Type = (int)propType.Type,
                         Subtype = (int)propType.Subtype,
                         Index = (byte)propertyId++,
-                        InterestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", 0L)
+                        // TODO: Should this default value be different?
+                        InterestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", long.MaxValue)
                     };
                     if (!result.Properties.ContainsKey(nodePath))
                     {
@@ -608,7 +616,8 @@ namespace HLNC.SourceGenerators
                     result.Functions[nodePath].Add(function.Name, functionCollected);
                 }
             }
-
+            
+            SceneDataCache[sceneResourcePath] = result;
             return result;
         }
 
@@ -620,10 +629,10 @@ namespace HLNC.SourceGenerators
             ScenesMap.Clear();
             SceneDataCache.Clear();
 #if DEBUG
-            //if (!Debugger.IsAttached)
-            //{
+            // if (!Debugger.IsAttached)
+            // {
             //   Debugger.Launch();
-            //}
+            // }
 #endif
         }
     }
