@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Scriban;
 using System.Reflection;
 using System.Collections.Immutable;
+using Scriban.Runtime.Accessors;
 
 namespace HLNC.SourceGenerators
 {
@@ -21,7 +22,6 @@ namespace HLNC.SourceGenerators
         public string NodePath;
         public string Name;
         public int Type;
-        public byte Index;
         public int Subtype;
         public string InterestMask;
         public string NetworkSerializerClass;
@@ -33,7 +33,6 @@ namespace HLNC.SourceGenerators
     {
         public string NodePath;
         public string Name;
-        public byte Index;
         public ExtendedVariantType[] Arguments;
         public bool WithPeer;
     }
@@ -88,7 +87,7 @@ namespace HLNC.SourceGenerators
                 case "System_Int32":
                 case "System_Byte":
                     propType = VariantType.Int;
-                    subType = t.SpecialType.ToString() == "System_Byte" ? VariantSubtype.Byte : VariantSubtype.Int;
+                    subType = t.SpecialType.ToString() == "System_Byte" ? VariantSubtype.Byte : t.SpecialType.ToString() == "System_Int32" ? VariantSubtype.Int : VariantSubtype.None;
                     break;
                 case "System_Single":
                     propType = VariantType.Float;
@@ -203,6 +202,8 @@ namespace HLNC.SourceGenerators
             return "";
         }
 
+        Dictionary<string, ClassData[]> networkNodeClasses;
+
         // Method to execute the source generator
         public void Execute(GeneratorExecutionContext context)
         {
@@ -211,12 +212,13 @@ namespace HLNC.SourceGenerators
             projectDir = projectDir.Replace("\\", "/");
             var scenes = context.AdditionalFiles.Where(f => f.Path.EndsWith(".tscn"));
             var sceneTextMap = scenes.Select((f, i) => new { Path = f.Path.Replace("\\", "/").Replace(projectDir, ""), Value = f.GetText().ToString() }).ToDictionary(x => x.Path, x => x.Value);
-            var networkNodeClasses = GetNetworkNodeClasses(context, sceneTextMap);
+            networkNodeClasses = GetNetworkNodeClasses(context);
 
             foreach (var sceneFile in scenes)
             {
                 var sceneResourcePath = sceneFile.Path.Replace("\\", "/").Replace(projectDir, "res://");
-                var result = CollectSceneData(sceneResourcePath, sceneFile.GetText()?.ToString(), networkNodeClasses, sceneTextMap);
+                var result = CollectSceneData(sceneResourcePath, sceneFile.GetText()?.ToString(), sceneTextMap);
+                if (!result.IsNetworkScene) continue;
                 if (result.StaticNetworkNodes.Count > 0)
                 {
                     StaticNetworkNodesMap[sceneResourcePath] = result.StaticNetworkNodes;
@@ -235,7 +237,7 @@ namespace HLNC.SourceGenerators
         }
 
         // Method to get network node classes
-        private Dictionary<string, ClassData[]> GetNetworkNodeClasses(GeneratorExecutionContext context, Dictionary<string, string> sceneTextMap)
+        private Dictionary<string, ClassData[]> GetNetworkNodeClasses(GeneratorExecutionContext context)
         {
             return context.Compilation.SyntaxTrees
                 .SelectMany(st => st.GetRoot()
@@ -256,7 +258,7 @@ namespace HLNC.SourceGenerators
         }
 
         // Method to collect scene data
-        private CollectedData CollectSceneData(string sceneResourcePath, string sceneFileContent, Dictionary<string, ClassData[]> networkNodeClasses, Dictionary<string, string> sceneTextMap)
+        private CollectedData CollectSceneData(string sceneResourcePath, string sceneFileContent, Dictionary<string, string> sceneTextMap)
         {
             if (SceneDataCache.TryGetValue(sceneResourcePath, out var cachedData))
             {
@@ -280,14 +282,13 @@ namespace HLNC.SourceGenerators
             var networkNodeClass = networkNodeClasses.Keys.FirstOrDefault(k => k.Contains(rootScript));
             if (!string.IsNullOrEmpty(networkNodeClass))
             {
+                Debug.WriteLine($"NetworkScene: {sceneResourcePath} with root node {parsedTscn.RootNode.Name} and script {rootScript} of class {networkNodeClass}");
                 result.IsNetworkScene = true;
                 byte sceneId = (byte)ScenesMap.Count;
                 ScenesMap.Add(sceneId, sceneResourcePath);
             }
 
             var nodePathId = 0;
-            var functionId = 0;
-            var propertyId = 0;
 
             // Iterate over each node in the scene
             foreach (var node in parsedTscn.Nodes)
@@ -315,7 +316,7 @@ namespace HLNC.SourceGenerators
                 // This means the node is a scene instance, and we need to recurse into the scene to collect the data
                 else if (node.Instance != null)
                 {
-                    var recurseData = CollectSceneData($"res://{node.Instance}", sceneTextMap[node.Instance], networkNodeClasses, sceneTextMap);
+                    var recurseData = CollectSceneData($"res://{node.Instance}", sceneTextMap[node.Instance], sceneTextMap);
 
                     // NetworkScene nodes exist within their own "root network context" so we do not flatten them into this current scene's data
                     if (recurseData.IsNetworkScene) continue;
@@ -327,12 +328,6 @@ namespace HLNC.SourceGenerators
                     }
                     foreach (var kvp in recurseData.Properties)
                     {
-                        foreach (var prop in kvp.Value)
-                        {
-                            var val = prop.Value;
-                            val.Index = (byte)propertyId++;
-                            kvp.Value[prop.Key] = val;
-                        }
                         result.Properties[nodePath + "/" + kvp.Key] = kvp.Value;
                     }
                     foreach (var kvp in recurseData.Functions)
@@ -352,6 +347,10 @@ namespace HLNC.SourceGenerators
                 // Collecting the fields marked as [NetworkProperty]
                 foreach (var property in nodeProperties)
                 {
+                    // Only the root node of a NetworkNode scene get a NetworkId.
+                    // TODO: Is there a better way to do this? Seems a bit weird to put the logic here.
+                    if (node != parsedTscn.RootNode && property.Name == "NetworkId") continue;
+
                     var networkSerializerName = "";
                     var bsonSerializerName = "";
                     var propType = GetVariantType(property.Type);
@@ -371,6 +370,8 @@ namespace HLNC.SourceGenerators
                     var interestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", -1L);
                     var interestMaskField = GetAttributeFieldValue(property, "NetworkProperty", "InterestMask");
 
+
+                    Debug.Print($"Property {sceneResourcePath} => {nodePath}.{property.Name} of type {propType.Type} with subtype {propType.Subtype} and interest mask {interestMask} and field value {interestMaskField}");
                     var propertyCollected = new CollectedNetworkProperty
                     {
                         BsonSerializerClass = bsonSerializerName,
@@ -379,7 +380,6 @@ namespace HLNC.SourceGenerators
                         Name = property.Name,
                         Type = (int)propType.Type,
                         Subtype = (int)propType.Subtype,
-                        Index = (byte)propertyId++,
                         InterestMask = interestMask == -1 ? interestMaskField : interestMask.ToString()
                     };
                     if (!result.Properties.ContainsKey(nodePath))
@@ -397,7 +397,6 @@ namespace HLNC.SourceGenerators
                     {
                         NodePath = nodePath,
                         Name = function.Name,
-                        Index = (byte)functionId++,
                         Arguments = function.Parameters.Select(p => GetVariantType(p.Type)).Skip(withPeer ? 1 : 0).ToArray(),
                         WithPeer = withPeer
                     };

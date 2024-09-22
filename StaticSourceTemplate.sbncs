@@ -47,6 +47,7 @@ namespace HLNC.Serialization
 
         private static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>> PROPERTIES_MAP = new Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>>(){
             {{ for scene in PropertiesMap }}
+                {{ i = 0 }}
                 {
                     "{{scene.Key}}", new Dictionary<string, Dictionary<string, CollectedNetworkProperty>>() {
                         {{ for node in scene.Value }}
@@ -58,7 +59,7 @@ namespace HLNC.Serialization
                                                 Name = "{{property.Value.Name}}",
                                                 Type = (Variant.Type){{property.Value.Type}},
                                                 Subtype = (HLNC.Serialization.VariantSubtype){{property.Value.Subtype}},
-                                                Index = {{property.Value.Index}},
+                                                Index = {{i++}},
                                                 InterestMask = {{property.Value.InterestMask}},
                                                 {{ if property.Value.NetworkSerializerClass != "" }}
                                                 NetworkSerialize = Callable.From((WorldRunner currentWorld, NetPeer peer, {{property.Value.NetworkSerializerClass}} obj) =>
@@ -89,6 +90,7 @@ namespace HLNC.Serialization
 
         private static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>> FUNCTIONS_MAP = new Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>>(){
             {{ for scene in FunctionsMap }}
+                {{ i = 0 }}
                 {
                     "{{scene.Key}}", new Dictionary<string, Dictionary<string, CollectedNetworkFunction>>() {
                         {{ for node in scene.Value }}
@@ -98,7 +100,7 @@ namespace HLNC.Serialization
                                         { "{{function.Key}}", new CollectedNetworkFunction{
                                                 NodePath = "{{node.Key}}",
                                                 Name = "{{function.Value.Name}}",
-                                                Index = {{function.Value.Index}},
+                                                Index = {{i++}},
                                                 Arguments = [
                                                     {{ for arg in function.Value.Arguments }}
                                                     new VariantType{
@@ -121,11 +123,12 @@ namespace HLNC.Serialization
 
         private static Dictionary<string, Dictionary<byte, CollectedNetworkFunction>> FUNCTIONS_LOOKUP = new Dictionary<string, Dictionary<byte, CollectedNetworkFunction>>(){
             {{ for scene in FunctionsMap }}
+                {{ i = 0 }}
                 {
                     "{{scene.Key}}", new Dictionary<byte, CollectedNetworkFunction>() {
                         {{ for node in scene.Value }}
                             {{ for function in node.Value }}
-                                { {{function.Value.Index}}, FUNCTIONS_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{function.Key}}"] },
+                                { {{i++}}, FUNCTIONS_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{function.Key}}"] },
                             {{ end }}
                         {{ end }}
                     }
@@ -135,11 +138,12 @@ namespace HLNC.Serialization
 
         private static Dictionary<string, Dictionary<byte, CollectedNetworkProperty>> PROPERTIES_LOOKUP = new Dictionary<string, Dictionary<byte, CollectedNetworkProperty>>(){
             {{ for scene in PropertiesMap }}
+                {{ i = 0 }}
                 {
                     "{{scene.Key}}", new Dictionary<byte, CollectedNetworkProperty>() {
                         {{ for node in scene.Value }}
                             {{ for property in node.Value }}
-                                { {{property.Value.Index}}, PROPERTIES_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{property.Key}}"] },
+                                { {{i++}}, PROPERTIES_MAP["{{scene.Key}}"]["{{node.Key}}"]["{{property.Key}}"] },
                             {{ end }}
                         {{ end }}
                     }
