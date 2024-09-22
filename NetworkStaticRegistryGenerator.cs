@@ -8,170 +8,14 @@ using System.Collections.Immutable;
 
 namespace HLNC.SourceGenerators
 {
-
+    // Enum representing various variant types
+    // This is a direct copy of the VariantType enum in Godot
     public enum VariantType : long
     {
-        //
-        // Summary:
-        //     Variable is null.
-        Nil,
-        //
-        // Summary:
-        //     Variable is of type System.Boolean.
-        Bool,
-        //
-        // Summary:
-        //     Variable is of type System.Int32.
-        Int,
-        //
-        // Summary:
-        //     Variable is of type System.Single.
-        Float,
-        //
-        // Summary:
-        //     Variable is of type System.String.
-        String,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector2.
-        Vector2,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector2I.
-        Vector2I,
-        //
-        // Summary:
-        //     Variable is of type Godot.Rect2.
-        Rect2,
-        //
-        // Summary:
-        //     Variable is of type Godot.Rect2I.
-        Rect2I,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector3.
-        Vector3,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector3I.
-        Vector3I,
-        //
-        // Summary:
-        //     Variable is of type Godot.Transform2D.
-        Transform2D,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector4.
-        Vector4,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector4I.
-        Vector4I,
-        //
-        // Summary:
-        //     Variable is of type Godot.Plane.
-        Plane,
-        //
-        // Summary:
-        //     Variable is of type Godot.Quaternion.
-        Quaternion,
-        //
-        // Summary:
-        //     Variable is of type Godot.Aabb.
-        Aabb,
-        //
-        // Summary:
-        //     Variable is of type Godot.Basis.
-        Basis,
-        //
-        // Summary:
-        //     Variable is of type Godot.Transform3D.
-        Transform3D,
-        //
-        // Summary:
-        //     Variable is of type Godot.Projection.
-        Projection,
-        //
-        // Summary:
-        //     Variable is of type Godot.Color.
-        Color,
-        //
-        // Summary:
-        //     Variable is of type Godot.StringName.
-        StringName,
-        //
-        // Summary:
-        //     Variable is of type Godot.NodePath.
-        NodePath,
-        //
-        // Summary:
-        //     Variable is of type Godot.Rid.
-        Rid,
-        //
-        // Summary:
-        //     Variable is of type Godot.GodotObject.
-        Object,
-        //
-        // Summary:
-        //     Variable is of type Godot.Callable.
-        Callable,
-        //
-        // Summary:
-        //     Variable is of type Godot.Signal.
-        Signal,
-        //
-        // Summary:
-        //     Variable is of type Godot.Collections.Dictionary.
-        Dictionary,
-        //
-        // Summary:
-        //     Variable is of type Godot.Collections.Array.
-        Array,
-        //
-        // Summary:
-        //     Variable is of type System.Byte[].
-        PackedByteArray,
-        //
-        // Summary:
-        //     Variable is of type System.Int32[].
-        PackedInt32Array,
-        //
-        // Summary:
-        //     Variable is of type System.Int64[].
-        PackedInt64Array,
-        //
-        // Summary:
-        //     Variable is of type System.Single[].
-        PackedFloat32Array,
-        //
-        // Summary:
-        //     Variable is of type System.Double[].
-        PackedFloat64Array,
-        //
-        // Summary:
-        //     Variable is of type System.String[].
-        PackedStringArray,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector2[].
-        PackedVector2Array,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector3[].
-        PackedVector3Array,
-        //
-        // Summary:
-        //     Variable is of type Godot.Color[].
-        PackedColorArray,
-        //
-        // Summary:
-        //     Variable is of type Godot.Vector4[].
-        PackedVector4Array,
-        //
-        // Summary:
-        //     Represents the size of the Godot.VariantType enum.
-        Max
+        Nil, Bool, Int, Float, String, Vector2, Vector2I, Rect2, Rect2I, Vector3, Vector3I, Transform2D, Vector4, Vector4I, Plane, Quaternion, Aabb, Basis, Transform3D, Projection, Color, StringName, NodePath, Rid, Object, Callable, Signal, Dictionary, Array, PackedByteArray, PackedInt32Array, PackedInt64Array, PackedFloat32Array, PackedFloat64Array, PackedStringArray, PackedVector2Array, PackedVector3Array, PackedColorArray, PackedVector4Array, Max
     }
+
+    // Struct representing a collected network property
     internal struct CollectedNetworkProperty
     {
         public string NodePath;
@@ -179,11 +23,12 @@ namespace HLNC.SourceGenerators
         public int Type;
         public byte Index;
         public int Subtype;
-        public long InterestMask;
+        public string InterestMask;
         public string NetworkSerializerClass;
         public string BsonSerializerClass;
     }
 
+    // Struct representing a collected network function
     internal struct CollectedNetworkFunction
     {
         public string NodePath;
@@ -192,18 +37,14 @@ namespace HLNC.SourceGenerators
         public ExtendedVariantType[] Arguments;
         public bool WithPeer;
     }
+
+    // Enum representing various variant subtypes
     public enum VariantSubtype
     {
-        None,
-        Guid,
-        Byte,
-        Int,
-        NetworkId,
-        NetworkNode,
-        AsyncPeerValue
-
+        None, Guid, Byte, Int, NetworkId, NetworkNode, AsyncPeerValue
     }
 
+    // Struct representing an extended variant type
     public struct ExtendedVariantType
     {
         public VariantType Type;
@@ -213,94 +54,81 @@ namespace HLNC.SourceGenerators
     [Generator]
     public class NetworkStaticRegistryGenerator : ISourceGenerator
     {
+        // TODO: We should actually use these and raise an error if they are exceeded
+        private const int MAX_NETWORK_PROPERTIES = 64;
+        private const int MAX_NETWORK_FUNCTIONS = 64;
+
+        // Maps for storing scene and network data
+        internal static Dictionary<byte, string> ScenesMap = new Dictionary<byte, string>();
+        internal static Dictionary<string, List<Tuple<int, string>>> StaticNetworkNodesMap = new Dictionary<string, List<Tuple<int, string>>>();
+        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>> PropertiesMap = new Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>>();
+        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>> FunctionsMap = new Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>>();
+
+        // Cache for scene data
+        private Dictionary<string, CollectedData> SceneDataCache = new Dictionary<string, CollectedData>();
+
+        // Struct representing collected data
+        struct CollectedData
+        {
+            public Dictionary<string, Dictionary<string, CollectedNetworkProperty>> Properties;
+            public Dictionary<string, Dictionary<string, CollectedNetworkFunction>> Functions;
+            public List<Tuple<int, string>> StaticNetworkNodes;
+            public bool IsNetworkScene;
+        }
+
+        // Method to get the variant type of a symbol
         public static ExtendedVariantType GetVariantType(ITypeSymbol t)
         {
             VariantType propType = VariantType.Nil;
             VariantSubtype subType = VariantSubtype.None;
 
-            if (t.SpecialType.ToString() == "System_Int64" || t.SpecialType.ToString() == "System_Int32" || t.SpecialType.ToString() == "System_Byte")
+            switch (t.SpecialType.ToString())
             {
-                propType = VariantType.Int;
-                if (t.SpecialType.ToString() == "System_Byte")
-                {
-                    subType = VariantSubtype.Byte;
-                }
-                else if (t.SpecialType.ToString() == "System_Int32")
-                {
-                    subType = VariantSubtype.Int;
-                }
-            }
-            else if (t.SpecialType.ToString() == "System_Single")
-            {
-                propType = VariantType.Float;
-            }
-            else if (t.SpecialType.ToString() == "System_String")
-            {
-                propType = VariantType.String;
-            }
-            else if (t.ToString() == "Godot.Vector3")
-            {
-                propType = VariantType.Vector3;
-            }
-            else if (t.ToString() == "Godot.Quaternion")
-            {
-                propType = VariantType.Quaternion;
-            }
-            else if (t.SpecialType.ToString() == "System_Boolean")
-            {
-                propType = VariantType.Bool;
-            }
-            else if (t.ToString() == "byte[]")
-            {
-                propType = VariantType.PackedByteArray;
-            }
-            else if (t.ToString().StartsWith("Godot.Collections.Dictionary"))
-            {
-                propType = VariantType.Dictionary;
-            }
-            // Now we identify if t is an enum
-            else if (t.TypeKind == TypeKind.Enum)
-            {
-                propType = VariantType.Int;
-                // var T = t.GetEnumUnderlyingType();
-            }
-            else if (t.TypeKind == TypeKind.Class)
-            {
-                propType = VariantType.Object;
-                if (t.ToString() == "HLNC.LazyPeerState")
-                {
-                    subType = VariantSubtype.AsyncPeerValue;
-                }
-                else if (t.ToString() == "HLNC.NetworkNode3D")
-                {
-                    subType = VariantSubtype.NetworkNode;
-                }
-            }
-            else if (t.TypeKind == TypeKind.Interface)
-            {
-                propType = VariantType.Object;
-                if (t.ToString() == "HLNC.LazyPeerState")
-                {
-                    subType = VariantSubtype.AsyncPeerValue;
-                }
-                else if (t.ToString() == "HLNC.NetworkNode3D")
-                {
-                    subType = VariantSubtype.NetworkNode;
-                }
-            } else {
-                Debug.WriteLine($"Unknown type: {t} with kind {t.TypeKind} and special type {t.SpecialType}");
+                case "System_Int64":
+                case "System_Int32":
+                case "System_Byte":
+                    propType = VariantType.Int;
+                    subType = t.SpecialType.ToString() == "System_Byte" ? VariantSubtype.Byte : VariantSubtype.Int;
+                    break;
+                case "System_Single":
+                    propType = VariantType.Float;
+                    break;
+                case "System_String":
+                    propType = VariantType.String;
+                    break;
+                case "System_Boolean":
+                    propType = VariantType.Bool;
+                    break;
+                default:
+                    if (t.ToString() == "Godot.Vector3")
+                        propType = VariantType.Vector3;
+                    else if (t.ToString() == "Godot.Quaternion")
+                        propType = VariantType.Quaternion;
+                    else if (t.ToString() == "byte[]")
+                        propType = VariantType.PackedByteArray;
+                    else if (t.ToString().StartsWith("Godot.Collections.Dictionary"))
+                        propType = VariantType.Dictionary;
+                    else if (t.TypeKind == TypeKind.Enum)
+                        propType = VariantType.Int;
+                    else if (t.TypeKind == TypeKind.Class || t.TypeKind == TypeKind.Interface)
+                    {
+                        propType = VariantType.Object;
+                        if (t.ToString() == "HLNC.LazyPeerState")
+                            subType = VariantSubtype.AsyncPeerValue;
+                        else if (t.ToString() == "HLNC.NetworkNode3D")
+                            subType = VariantSubtype.NetworkNode;
+                    }
+                    else
+                        Debug.WriteLine($"Unknown type: {t} with kind {t.TypeKind} and special type {t.SpecialType}");
+                    break;
             }
 
-            return new ExtendedVariantType
-            {
-                Type = propType,
-                Subtype = subType
-            };
+            return new ExtendedVariantType { Type = propType, Subtype = subType };
         }
 
+        // Method to read a resource file
         public string ReadResource(string name)
         {
-            // Determine path
             var assembly = Assembly.GetExecutingAssembly();
             using (Stream stream = assembly.GetManifestResourceStream($"HLNC.SourceGenerators.{name}"))
             using (StreamReader reader = new StreamReader(stream))
@@ -308,36 +136,12 @@ namespace HLNC.SourceGenerators
                 return reader.ReadToEnd();
             }
         }
-        private const int MAX_NETWORK_PROPERTIES = 64;
-        private const int MAX_NETWORK_FUNCTIONS = byte.MaxValue;
 
-        /// <summary>
-        /// Map of scene IDs to scene paths
-        /// </summary>
-        internal static Dictionary<byte, string> ScenesMap = [];
-
-        /// <summary>
-        /// A map of every packed scene to a list of paths to its internal network nodes.
-        /// </summary>
-        internal static Dictionary<string, List<Tuple<int, string>>> StaticNetworkNodesMap = [];
-
-
-        /// <summary>
-        /// A Dictionary of ScenePath to NodePath to PropertyName to CollectedNetworkProperty.
-        /// It includes all child Network Nodes within the Scene including itself, but not nested network scenes.
-        /// </summary>
-        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkProperty>>> PropertiesMap = [];
-        internal static Dictionary<string, Dictionary<string, Dictionary<string, CollectedNetworkFunction>>> FunctionsMap = [];
+        // Method to get parent types of a class
         public static IEnumerable<INamedTypeSymbol> GetParentTypes(GeneratorExecutionContext context, ClassDeclarationSyntax type)
         {
-            // is there any base type?
-            if (type == null)
-            {
-                yield break;
-            }
-            // (n as ClassDeclarationSyntax).BaseList?.Types.Any(t => t.Type.ToString() == "NetworkNode3D") == true;
+            if (type == null) yield break;
 
-            // return all inherited types
             var currentBaseType = ModelExtensions.GetDeclaredSymbol(context.Compilation.GetSemanticModel(type.SyntaxTree), type);
             while (currentBaseType != null)
             {
@@ -346,11 +150,13 @@ namespace HLNC.SourceGenerators
             }
         }
 
+        // Method to check if a type is NetworkNode3D
         public static bool IsNetworkNode3D(IEnumerable<INamedTypeSymbol> types)
         {
             return types.Any(t => t.ToString() == "HLNC.NetworkNode3D");
         }
 
+        // Struct representing class data
         public struct ClassData
         {
             public INamedTypeSymbol ClassSymbol;
@@ -358,6 +164,7 @@ namespace HLNC.SourceGenerators
             public IEnumerable<IMethodSymbol> Functions;
         }
 
+        // Method to get attribute argument
         private T GetAttributeArgument<T>(ISymbol sym, string attributeName, string argumentName, T defaultValue)
         {
             var attribute = sym.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == attributeName);
@@ -368,29 +175,35 @@ namespace HLNC.SourceGenerators
                 {
                     return (T)interestMaskArgument.Value.Value;
                 }
-                // Check to see if "argumentName" is a field of the attribute with a default value
-                // var field = attribute.AttributeClass.GetMembers().FirstOrDefault(m => m.Name == argumentName);
-                // if (field != null)
-                // {
-                //     var equalsSyntax = field.DeclaringSyntaxReferences[0].GetSyntax() switch
-                //     {
-                //         PropertyDeclarationSyntax property => property.Initializer,
-                //         VariableDeclaratorSyntax variable => variable.Initializer,
-                //         _ => throw new Exception("Unknown declaration syntax")
-                //     };
-
-                //     // If the property/field has an initializer
-                //     if (equalsSyntax is not null)
-                //     {
-                //         return equalsSyntax.Value.ToString();
-                //     }
-                // }
             }
             return defaultValue;
         }
 
-        Dictionary<string, CollectedData> SceneDataCache = new Dictionary<string, CollectedData>();
+        // Method to get attribute field value
+        private string GetAttributeFieldValue(ISymbol sym, string attributeName, string argumentName)
+        {
+            var attribute = sym.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == attributeName);
+            if (attribute != null)
+            {
+                var field = attribute.AttributeClass.GetMembers().FirstOrDefault(m => m.Name == argumentName);
+                if (field != null)
+                {
+                    var equalsSyntax = field.DeclaringSyntaxReferences[0].GetSyntax() switch
+                    {
+                        PropertyDeclarationSyntax property => property.Initializer,
+                        VariableDeclaratorSyntax variable => variable.Initializer,
+                        _ => throw new Exception("Unknown declaration syntax")
+                    };
+                    if (equalsSyntax is not null)
+                    {
+                        return equalsSyntax.Value.ToString();
+                    }
+                }
+            }
+            return "";
+        }
 
+        // Method to execute the source generator
         public void Execute(GeneratorExecutionContext context)
         {
             var projectDir = "";
@@ -398,53 +211,12 @@ namespace HLNC.SourceGenerators
             projectDir = projectDir.Replace("\\", "/");
             var scenes = context.AdditionalFiles.Where(f => f.Path.EndsWith(".tscn"));
             var sceneTextMap = scenes.Select((f, i) => new { Path = f.Path.Replace("\\", "/").Replace(projectDir, ""), Value = f.GetText().ToString() }).ToDictionary(x => x.Path, x => x.Value);
-            Dictionary<string, ClassData[]> networkNodeClasses = context.Compilation.SyntaxTrees
-                .SelectMany(st => st.GetRoot()
-                        .DescendantNodes()
-                        .Where(n =>
-                        {
-                            if (n is not ClassDeclarationSyntax) return false;
-                            return IsNetworkNode3D(GetParentTypes(context, n as ClassDeclarationSyntax));
-                        })
-                        .Select(n =>
-                        {
-                            var types = GetParentTypes(context, n as ClassDeclarationSyntax);
-                            var classes = types.Select(t =>
-                            {
-                                var props = t.GetMembers().Where(m => m.GetAttributes().Any(a => a.AttributeClass != null && a.AttributeClass.Name == "NetworkProperty"))
-                                .OfType<IPropertySymbol>();
-                                // Now get all the functions with the attribute NetworkFunction
-                                var functions = t.GetMembers().Where(m => m.GetAttributes().Any(a => a.AttributeClass != null && a.AttributeClass.Name == "NetworkFunction"))
-                                .OfType<IMethodSymbol>();
-                                return new ClassData
-                                {
-                                    ClassSymbol = t,
-                                    Properties = props,
-                                    Functions = functions
-                                };
-                            }).ToArray();
+            var networkNodeClasses = GetNetworkNodeClasses(context, sceneTextMap);
 
-                            return new { FilePath = st.FilePath, Data = classes };
-                        }))
-                        .ToDictionary(x => x.FilePath.Replace("\\", "/"), x => x.Data);
-
-            var sceneClassPaths = networkNodeClasses.Keys.ToImmutableHashSet();
-            // Pretty print the scene classes
-            // foreach (var sceneClass in sceneClasses)
-            // {
-            //     Debug.WriteLine($"Scene class: {sceneClass.Key}, {sceneClass.Value}");
-            // }
-
-            Dictionary<string, HashSet<string>> networkNodeTree = new Dictionary<string, HashSet<string>>();
-
-            // Now we iterate and parse every scene
-
-
-            // Collect all "scenePaths" values from the NetworkScenes attribute
             foreach (var sceneFile in scenes)
             {
                 var sceneResourcePath = sceneFile.Path.Replace("\\", "/").Replace(projectDir, "res://");
-                var result = CollectSceneData(sceneResourcePath, sceneFile.GetText()?.ToString(), networkNodeClasses, sceneClassPaths, sceneTextMap);
+                var result = CollectSceneData(sceneResourcePath, sceneFile.GetText()?.ToString(), networkNodeClasses, sceneTextMap);
                 if (result.StaticNetworkNodes.Count > 0)
                 {
                     StaticNetworkNodesMap[sceneResourcePath] = result.StaticNetworkNodes;
@@ -459,25 +231,38 @@ namespace HLNC.SourceGenerators
                 }
             }
 
-            // Add the source code to the compilation
             context.AddSource($"NetworkScenesRegister.g.cs", Template.Parse(ReadResource("StaticSourceTemplate.sbncs")).Render(new { ScenesMap = ScenesMap.ToArray(), StaticNetworkNodesMap = StaticNetworkNodesMap.ToArray(), PropertiesMap, FunctionsMap }, member => member.Name));
         }
 
-
-        struct CollectedData
+        // Method to get network node classes
+        private Dictionary<string, ClassData[]> GetNetworkNodeClasses(GeneratorExecutionContext context, Dictionary<string, string> sceneTextMap)
         {
-            public Dictionary<string, Dictionary<string, CollectedNetworkProperty>> Properties;
-            public Dictionary<string, Dictionary<string, CollectedNetworkFunction>> Functions;
-            public List<Tuple<int, string>> StaticNetworkNodes;
-            public bool IsNetworkScene;
+            return context.Compilation.SyntaxTrees
+                .SelectMany(st => st.GetRoot()
+                    .DescendantNodes()
+                    .Where(n => n is ClassDeclarationSyntax && IsNetworkNode3D(GetParentTypes(context, n as ClassDeclarationSyntax)))
+                    .Select(n =>
+                    {
+                        var types = GetParentTypes(context, n as ClassDeclarationSyntax);
+                        var classes = types.Select(t =>
+                        {
+                            var props = t.GetMembers().Where(m => m.GetAttributes().Any(a => a.AttributeClass != null && a.AttributeClass.Name == "NetworkProperty")).OfType<IPropertySymbol>();
+                            var functions = t.GetMembers().Where(m => m.GetAttributes().Any(a => a.AttributeClass != null && a.AttributeClass.Name == "NetworkFunction")).OfType<IMethodSymbol>();
+                            return new ClassData { ClassSymbol = t, Properties = props, Functions = functions };
+                        }).ToArray();
+                        return new { FilePath = st.FilePath, Data = classes };
+                    }))
+                .ToDictionary(x => x.FilePath.Replace("\\", "/"), x => x.Data);
         }
 
-        private CollectedData CollectSceneData(string sceneResourcePath, string sceneFileContent, Dictionary<string, ClassData[]> networkNodeClasses, ImmutableHashSet<string> sceneClassPaths, Dictionary<string, string> sceneTextMap)
+        // Method to collect scene data
+        private CollectedData CollectSceneData(string sceneResourcePath, string sceneFileContent, Dictionary<string, ClassData[]> networkNodeClasses, Dictionary<string, string> sceneTextMap)
         {
             if (SceneDataCache.TryGetValue(sceneResourcePath, out var cachedData))
             {
                 return cachedData;
             }
+
             CollectedData result = new CollectedData
             {
                 Properties = new Dictionary<string, Dictionary<string, CollectedNetworkProperty>>(),
@@ -485,11 +270,13 @@ namespace HLNC.SourceGenerators
                 StaticNetworkNodes = new List<Tuple<int, string>>(),
                 IsNetworkScene = false
             };
+
+
+            // Parse the scene file into its respective nodes and resources
             var parser = new ConfigParser();
             var parsedTscn = parser.ParseTscnFile(sceneFileContent ?? "");
-            string rootScript = "";
-            if (parsedTscn.RootNode == null || !parsedTscn.RootNode.Properties.TryGetValue("script", out rootScript)) return result;
-            // Get the networkNodeClass of the parsed scene
+            if (parsedTscn.RootNode == null || !parsedTscn.RootNode.Properties.TryGetValue("script", out var rootScript)) return result;
+
             var networkNodeClass = networkNodeClasses.Keys.FirstOrDefault(k => k.Contains(rootScript));
             if (!string.IsNullOrEmpty(networkNodeClass))
             {
@@ -502,6 +289,7 @@ namespace HLNC.SourceGenerators
             var functionId = 0;
             var propertyId = 0;
 
+            // Iterate over each node in the scene
             foreach (var node in parsedTscn.Nodes)
             {
                 IEnumerable<IPropertySymbol> nodeProperties;
@@ -509,34 +297,30 @@ namespace HLNC.SourceGenerators
                 ClassData[] classDatas;
                 var nodePath = node.Parent == null ? "." : node.Parent == "." ? node.Name : $"{node.Parent}/{node.Name}";
 
-                // The node is a NetworkNode3D
+                // If the node has a script attached, first we check if the class is a NetworkNode3D
+                // TODO: In the future, this should be expanded to include other types of network nodes, e.g. in GDScript.
                 if (node.Properties.TryGetValue("script", out var script))
                 {
-                    var classPath = sceneClassPaths.FirstOrDefault(p => p.Contains(script));
-                    Debug.WriteLine($"CLASS: {classPath}, script: {script}");
-                    if (string.IsNullOrEmpty(classPath))
-                    {
-                        continue;
-                    }
+                    var classPath = networkNodeClasses.Keys.FirstOrDefault(p => p.Contains(script));
+                    if (string.IsNullOrEmpty(classPath)) continue;
+
                     if (networkNodeClasses.TryGetValue(classPath, out classDatas))
                     {
-                        // Get all of the properties of the class
                         nodeProperties = classDatas.SelectMany(c => c.Properties);
                         nodeFunctions = classDatas.SelectMany(c => c.Functions);
                     }
-                    else
-                    {
-                        continue;
-                    }
+                    else continue;
                 }
-                // The node is a scene that we want to recurse through
+                // If there is no script attached, then we check if there is an "Instance" attached
+                // This means the node is a scene instance, and we need to recurse into the scene to collect the data
                 else if (node.Instance != null)
                 {
-                    var recurseData = CollectSceneData($"res://{node.Instance}", sceneTextMap[node.Instance], networkNodeClasses, sceneClassPaths, sceneTextMap);
-                    if (recurseData.IsNetworkScene)
-                    {
-                        continue;
-                    }
+                    var recurseData = CollectSceneData($"res://{node.Instance}", sceneTextMap[node.Instance], networkNodeClasses, sceneTextMap);
+
+                    // NetworkScene nodes exist within their own "root network context" so we do not flatten them into this current scene's data
+                    if (recurseData.IsNetworkScene) continue;
+
+                    // Flatten the static network nodes, properties, and functions from the instance to the current scene
                     foreach (var nodePathTuple in recurseData.StaticNetworkNodes)
                     {
                         result.StaticNetworkNodes.Add(new Tuple<int, string>(nodePathId++, nodePath + "/" + nodePathTuple.Item2));
@@ -557,13 +341,15 @@ namespace HLNC.SourceGenerators
                     }
                     continue;
                 }
-                else
-                {
-                    // It's just a normal node, so we skip. Nested nodes are included as part of the parent scene, thus will be reached eventually in the loop.
-                    continue;
-                }
+                // The node is neither a script nor an instance, so we skip it
+                // This won't miss its child nodes, because non-scene nodes are flattened out in the tscn files and thus will be picked up.
+                else continue;
+
+                // Collect the node path and add it to the static network nodes
+                // This allows us to reference the node by a compact ID across the network
                 result.StaticNetworkNodes.Add(new Tuple<int, string>(nodePathId++, nodePath));
-                // Now we get all properties from classWithAttribute which have the attribute "NetworkProperty"
+
+                // Collecting the fields marked as [NetworkProperty]
                 foreach (var property in nodeProperties)
                 {
                     var networkSerializerName = "";
@@ -573,9 +359,17 @@ namespace HLNC.SourceGenerators
 
                     if (propType.Type == VariantType.Object)
                     {
+                        // If the property is an object, we check if they define custom serializers, and if so then we find the class name which implements them
                         networkSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "INetworkSerializable")).ClassSymbol.Name;
                         bsonSerializerName = classDatas.FirstOrDefault(c => c.ClassSymbol.Interfaces.Any(i => i.Name == "IBsonSerializable")).ClassSymbol.Name;
                     }
+
+
+                    // Check if the property has an interest mask defined, and if so, use that, otherwise use the field value
+                    // TODO: Maybe a bit of a hack to say -1L is the default value (i.e. unset by user?)
+                    // I wonder if there's a good way to merge these two methods.
+                    var interestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", -1L);
+                    var interestMaskField = GetAttributeFieldValue(property, "NetworkProperty", "InterestMask");
 
                     var propertyCollected = new CollectedNetworkProperty
                     {
@@ -586,8 +380,7 @@ namespace HLNC.SourceGenerators
                         Type = (int)propType.Type,
                         Subtype = (int)propType.Subtype,
                         Index = (byte)propertyId++,
-                        // TODO: Should this default value be different?
-                        InterestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", long.MaxValue)
+                        InterestMask = interestMask == -1 ? interestMaskField : interestMask.ToString()
                     };
                     if (!result.Properties.ContainsKey(nodePath))
                     {
@@ -596,6 +389,7 @@ namespace HLNC.SourceGenerators
                     result.Properties[nodePath].Add(property.Name, propertyCollected);
                 }
 
+                // Collect the [NetworkFunction] RPC methods
                 foreach (var function in nodeFunctions)
                 {
                     var withPeer = GetAttributeArgument(function, "NetworkFunction", "WithPeer", false);
@@ -604,8 +398,6 @@ namespace HLNC.SourceGenerators
                         NodePath = nodePath,
                         Name = function.Name,
                         Index = (byte)functionId++,
-                        // We skip the first argument, because that is the peer which made the call to the function
-                        // Thus, not a networked argument
                         Arguments = function.Parameters.Select(p => GetVariantType(p.Type)).Skip(withPeer ? 1 : 0).ToArray(),
                         WithPeer = withPeer
                     };
@@ -616,19 +408,25 @@ namespace HLNC.SourceGenerators
                     result.Functions[nodePath].Add(function.Name, functionCollected);
                 }
             }
-            
+
+            // Cache the collected data for the scene so that we don't have to re-parse it if it is used in other scenes
             SceneDataCache[sceneResourcePath] = result;
             return result;
         }
 
+        // Method to initialize the source generator
         public void Initialize(GeneratorInitializationContext context)
         {
+            // Apparently when you run the build multiple times, these values might not be cleared automatically?
+            // I don't fully understand this (it is probably documented somewhere). I guess the Generator might still exist
+            // Between builds somehow.
             PropertiesMap.Clear();
             FunctionsMap.Clear();
             StaticNetworkNodesMap.Clear();
             ScenesMap.Clear();
             SceneDataCache.Clear();
 #if DEBUG
+            // Uncomment the following lines to attach the debugger
             // if (!Debugger.IsAttached)
             // {
             //   Debugger.Launch();
