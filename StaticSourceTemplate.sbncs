@@ -72,9 +72,9 @@ namespace HLNC.Serialization
                                                 }),
                                                 {{ end }}
                                                 {{ if property.Value.BsonSerializerClass != "" }}
-                                                BsonDeserialize = (BsonValue doc) =>
+                                                BsonDeserialize = (Variant context, BsonValue doc, GodotObject instance) =>
                                                 {
-                                                    return {{property.Value.BsonSerializerClass}}.BsonDeserialize(doc);
+                                                    return {{property.Value.BsonSerializerClass}}.BsonDeserialize(context, doc, instance);
                                                 },
                                                 {{ end }}
                                             }
