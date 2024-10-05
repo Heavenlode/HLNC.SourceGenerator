@@ -365,8 +365,14 @@ namespace HLNC.SourceGenerators
                             .Where(syntax => syntax != null)
                             .SelectMany(syntax => GetParentTypes(context, syntax));
 
-                        networkSerializerName = propertyParentTypes.FirstOrDefault(t => t.Interfaces.Any(i => i.Name == "INetworkSerializable"))?.Name;
-                        bsonSerializerName = propertyParentTypes.FirstOrDefault(t => t.Interfaces.Any(i => i.Name == "IBsonSerializable"))?.Name;
+                        var networkSerializerSymbol = propertyParentTypes.FirstOrDefault(t => t.Interfaces.Any(i => i.Name == "INetworkSerializable"));
+                        if (!string.IsNullOrEmpty(networkSerializerSymbol?.ContainingNamespace?.ToString()) && !string.IsNullOrEmpty(networkSerializerSymbol?.Name)) {
+                            networkSerializerName = $"{networkSerializerSymbol?.ContainingNamespace}.{networkSerializerSymbol?.Name}" ?? "";
+                        }
+                        var bsonSerializerSymbol = propertyParentTypes.FirstOrDefault(t => t.Interfaces.Any(i => i.Name == "IBsonSerializable"));
+                        if (!string.IsNullOrEmpty(bsonSerializerSymbol?.ContainingNamespace?.ToString()) && !string.IsNullOrEmpty(bsonSerializerSymbol?.Name)) {
+                            bsonSerializerName = $"{bsonSerializerSymbol?.ContainingNamespace}.{bsonSerializerSymbol?.Name}" ?? "";
+                        }
                     }
 
 
