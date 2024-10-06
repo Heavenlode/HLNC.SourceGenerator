@@ -107,8 +107,10 @@ namespace HLNC.SourceGenerators
                         propType = VariantType.PackedByteArray;
                     else if (t.ToString().StartsWith("Godot.Collections.Dictionary"))
                         propType = VariantType.Dictionary;
-                    else if (t.TypeKind == TypeKind.Enum)
+                    else if (t.TypeKind == TypeKind.Enum) {
                         propType = VariantType.Int;
+                        subType = VariantSubtype.Int;
+                    }
                     else if (t.TypeKind == TypeKind.Class || t.TypeKind == TypeKind.Interface)
                     {
                         propType = VariantType.Object;
