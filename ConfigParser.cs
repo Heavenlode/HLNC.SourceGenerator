@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace HLNC.SourceGenerators
+namespace HLNC.SourceGenerator
 {
     public class ConfigParser
     {

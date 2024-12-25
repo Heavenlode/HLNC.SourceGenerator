@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Collections.Immutable;
 using Scriban.Runtime.Accessors;
 
-namespace HLNC.SourceGenerators
+namespace HLNC.SourceGenerator
 {
     // Enum representing various variant types
     // This is a direct copy of the VariantType enum in Godot
@@ -40,7 +40,7 @@ namespace HLNC.SourceGenerators
     // Enum representing various variant subtypes
     public enum VariantSubtype
     {
-        None, Guid, Byte, Int, NetworkId, NetworkNode, AsyncPeerValue
+        None, Guid, Byte, Int, NetworkId, NetworkNode, Lazy
     }
 
     // Struct representing an extended variant type
@@ -115,7 +115,7 @@ namespace HLNC.SourceGenerators
                     {
                         propType = VariantType.Object;
                         if (t.ToString() == "HLNC.LazyPeerState")
-                            subType = VariantSubtype.AsyncPeerValue;
+                            subType = VariantSubtype.Lazy;
                         else if (t.ToString() == "HLNC.NetworkNode3D")
                             subType = VariantSubtype.NetworkNode;
                     }
@@ -131,7 +131,7 @@ namespace HLNC.SourceGenerators
         public string ReadResource(string name)
         {
             var assembly = Assembly.GetExecutingAssembly();
-            using (Stream stream = assembly.GetManifestResourceStream($"HLNC.SourceGenerators.{name}"))
+            using (Stream stream = assembly.GetManifestResourceStream($"HLNC.SourceGenerator.{name}"))
             using (StreamReader reader = new StreamReader(stream))
             {
                 return reader.ReadToEnd();

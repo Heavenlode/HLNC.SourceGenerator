@@ -6,10 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TargetFramework>netstandard2.0</TargetFramework>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <AssemblyName>HLNC.SourceGenerators</AssemblyName>
-    <RootNamespace>HLNC.SourceGenerators</RootNamespace>
+    <AssemblyName>HLNC.SourceGenerator</AssemblyName>
+    <RootNamespace>HLNC.SourceGenerator</RootNamespace>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
     <None Include="Package\build\$(AssemblyName).targets" Pack="true" PackagePath="build" />
