@@ -1,11 +1,8 @@
 using Microsoft.CodeAnalysis;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.CSharp;
 using Scriban;
 using System.Reflection;
-using System.Collections.Immutable;
-using Scriban.Runtime.Accessors;
 
 namespace HLNC.SourceGenerator
 {
@@ -116,7 +113,7 @@ namespace HLNC.SourceGenerator
                         propType = VariantType.Object;
                         if (t.ToString() == "HLNC.LazyPeerState")
                             subType = VariantSubtype.Lazy;
-                        else if (t.ToString() == "HLNC.NetworkNode3D")
+                        else if (IsNetworkNode(GetAllBaseTypesAndInterfaces(t)))
                             subType = VariantSubtype.NetworkNode;
                     }
                     else
@@ -125,6 +122,26 @@ namespace HLNC.SourceGenerator
             }
 
             return new ExtendedVariantType { Type = propType, Subtype = subType };
+        }
+
+        // New helper method to get all base types and interfaces
+        private static IEnumerable<INamedTypeSymbol> GetAllBaseTypesAndInterfaces(ITypeSymbol type)
+        {
+            if (type == null) yield break;
+
+            var current = type as INamedTypeSymbol;
+            while (current != null)
+            {
+                yield return current;
+                
+                // Get interfaces for the current type
+                foreach (var iface in current.Interfaces)
+                {
+                    yield return iface;
+                }
+                
+                current = current.BaseType;
+            }
         }
 
         // Method to read a resource file
@@ -151,10 +168,10 @@ namespace HLNC.SourceGenerator
             }
         }
 
-        // Method to check if a type is NetworkNode3D
-        public static bool IsNetworkNode3D(IEnumerable<INamedTypeSymbol> types)
+        // Method to check if a type is NetworkNode
+        public static bool IsNetworkNode(IEnumerable<INamedTypeSymbol> types)
         {
-            return types.Any(t => t.ToString() == "HLNC.NetworkNode3D");
+            return types.Any(t => t.Interfaces.Any(i => i.Name == "INetworkNode"));
         }
 
         // Struct representing class data
@@ -244,7 +261,7 @@ namespace HLNC.SourceGenerator
             return context.Compilation.SyntaxTrees
                 .SelectMany(st => st.GetRoot()
                     .DescendantNodes()
-                    .Where(n => n is ClassDeclarationSyntax && IsNetworkNode3D(GetParentTypes(context, n as ClassDeclarationSyntax)))
+                    .Where(n => n is ClassDeclarationSyntax && IsNetworkNode(GetParentTypes(context, n as ClassDeclarationSyntax)))
                     .Select(n =>
                     {
                         var types = GetParentTypes(context, n as ClassDeclarationSyntax);
@@ -300,7 +317,7 @@ namespace HLNC.SourceGenerator
                 ClassData[] classDatas;
                 var nodePath = node.Parent == null ? "." : node.Parent == "." ? node.Name : $"{node.Parent}/{node.Name}";
 
-                // If the node has a script attached, first we check if the class is a NetworkNode3D
+                // If the node has a script attached, first we check if the class is a NetworkNode
                 // TODO: In the future, this should be expanded to include other types of network nodes, e.g. in GDScript.
                 if (node.Properties.TryGetValue("script", out var script))
                 {
