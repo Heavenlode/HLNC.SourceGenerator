@@ -5,7 +5,7 @@
     <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AssemblyName>HLNC.SourceGenerator</AssemblyName>
     <RootNamespace>HLNC.SourceGenerator</RootNamespace>
