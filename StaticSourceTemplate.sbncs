@@ -8,6 +8,14 @@ using MongoDB.Bson;
 
 namespace HLNC.Serialization
 {
+
+    public enum SerialTypeIdentifiers
+    {
+        {{ for subtype in VariantSubtypes }}
+            {{subtype.Key}} = {{subtype.Value}},
+        {{ end }}
+    }
+
     public static partial class NetworkScenesRegister
     {
         private static Dictionary<byte, string> SCENES_MAP = new Dictionary<byte, string>(){
@@ -57,25 +65,27 @@ namespace HLNC.Serialization
                                         { "{{property.Key}}", new CollectedNetworkProperty{
                                                 NodePath = "{{node.Key}}",
                                                 Name = "{{property.Value.Name}}",
-                                                Type = (Variant.Type){{property.Value.Type}},
-                                                Subtype = (HLNC.Serialization.VariantSubtype){{property.Value.Subtype}},
+                                                VariantType = (Variant.Type){{property.Value.Type}},
+                                                Metadata = new SerialMetadata {
+                                                    TypeIdentifier = (SerialTypeIdentifiers){{property.Value.Subtype}}
+                                                },
                                                 Index = {{i++}},
                                                 InterestMask = {{property.Value.InterestMask}},
                                                 {{ if property.Value.NetworkSerializerClass != "" }}
-                                                NetworkSerialize = Callable.From((WorldRunner currentWorld, NetPeer peer, {{property.Value.NetworkSerializerClass}} obj) =>
-                                                {
-                                                    return {{property.Value.NetworkSerializerClass}}.NetworkSerialize(currentWorld, peer, obj) as HLBuffer;
-                                                }),
-                                                NetworkDeserialize = Callable.From((WorldRunner currentWorld, HLBuffer buffer, {{property.Value.NetworkSerializerClass}} obj) =>
-                                                {
-                                                    return {{property.Value.NetworkSerializerClass}}.NetworkDeserialize(currentWorld, buffer, obj);
-                                                }),
+                                                    NetworkSerialize = Callable.From((WorldRunner currentWorld, NetPeer peer, {{property.Value.NetworkSerializerClass}} obj) =>
+                                                    {
+                                                        return {{property.Value.NetworkSerializerClass}}.NetworkSerialize(currentWorld, peer, obj) as HLBuffer;
+                                                    }),
+                                                    NetworkDeserialize = Callable.From((WorldRunner currentWorld, HLBuffer buffer, {{property.Value.NetworkSerializerClass}} obj) =>
+                                                    {
+                                                        return {{property.Value.NetworkSerializerClass}}.NetworkDeserialize(currentWorld, buffer, obj);
+                                                    }),
                                                 {{ end }}
                                                 {{ if property.Value.BsonSerializerClass != "" }}
-                                                BsonDeserialize = Callable.From((Variant context, byte[] doc, {{property.Value.BsonSerializerClass}} obj) =>
-                                                {
-                                                    return {{property.Value.BsonSerializerClass}}.BsonDeserialize(context, doc, obj);
-                                                }),
+                                                    BsonDeserialize = Callable.From((Variant context, byte[] doc, {{property.Value.BsonSerializerClass}} obj) =>
+                                                    {
+                                                        return {{property.Value.BsonSerializerClass}}.BsonDeserialize(context, doc, obj);
+                                                    }),
                                                 {{ end }}
                                             }
                                         },
@@ -103,9 +113,11 @@ namespace HLNC.Serialization
                                                 Index = {{i++}},
                                                 Arguments = [
                                                     {{ for arg in function.Value.Arguments }}
-                                                    new VariantType{
-                                                        Type = Variant.Type.{{arg.Type}},
-                                                        Subtype = VariantSubtype.{{arg.Subtype}},
+                                                    new NetworkFunctionArgument{
+                                                        VariantType = Variant.Type.{{arg.Type}},
+                                                        Metadata = new SerialMetadata {
+                                                            TypeIdentifier = (SerialTypeIdentifiers){{arg.Subtype}}
+                                                        },
                                                     },
                                                     {{ end }}
                                                 ],

@@ -34,17 +34,11 @@ namespace HLNC.SourceGenerator
         public bool WithPeer;
     }
 
-    // Enum representing various variant subtypes
-    public enum VariantSubtype
-    {
-        None, Guid, Byte, Int, NetworkId, NetworkNode, Lazy
-    }
-
     // Struct representing an extended variant type
     public struct ExtendedVariantType
     {
         public VariantType Type;
-        public VariantSubtype Subtype;
+        public int Subtype;
     }
 
     [Generator]
@@ -72,11 +66,18 @@ namespace HLNC.SourceGenerator
             public bool IsNetworkScene;
         }
 
+        public Dictionary<string, int> VariantSubtypes = new Dictionary<string, int> {
+            { "None", 0 },
+            { "Guid", 1 },
+            { "Byte", 2 },
+            { "Int", 3 },
+        };
+
         // Method to get the variant type of a symbol
-        public static ExtendedVariantType GetVariantType(ITypeSymbol t)
+        public ExtendedVariantType GetVariantType(ITypeSymbol t)
         {
             VariantType propType = VariantType.Nil;
-            VariantSubtype subType = VariantSubtype.None;
+            int subType = 0;
 
             switch (t.SpecialType.ToString())
             {
@@ -84,7 +85,7 @@ namespace HLNC.SourceGenerator
                 case "System_Int32":
                 case "System_Byte":
                     propType = VariantType.Int;
-                    subType = t.SpecialType.ToString() == "System_Byte" ? VariantSubtype.Byte : t.SpecialType.ToString() == "System_Int32" ? VariantSubtype.Int : VariantSubtype.None;
+                    subType = t.SpecialType.ToString() == "System_Byte" ? VariantSubtypes["Byte"] : t.SpecialType.ToString() == "System_Int32" ? VariantSubtypes["Int"] : VariantSubtypes["None"];
                     break;
                 case "System_Single":
                     propType = VariantType.Float;
@@ -106,15 +107,21 @@ namespace HLNC.SourceGenerator
                         propType = VariantType.Dictionary;
                     else if (t.TypeKind == TypeKind.Enum) {
                         propType = VariantType.Int;
-                        subType = VariantSubtype.Int;
                     }
                     else if (t.TypeKind == TypeKind.Class || t.TypeKind == TypeKind.Interface)
                     {
                         propType = VariantType.Object;
-                        if (t.ToString() == "HLNC.LazyPeerState")
-                            subType = VariantSubtype.Lazy;
-                        else if (IsNetworkNode(GetAllBaseTypesAndInterfaces(t)))
-                            subType = VariantSubtype.NetworkNode;
+                        // Check for VariantIdentifier attribute in the type and all its base types
+                        var currentType = t;
+                        while (currentType != null)
+                        {
+                            var attribute = currentType.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "VariantIdentifier");
+                            if (attribute != null) {
+                                subType = VariantSubtypes[attribute.ConstructorArguments[0].Value.ToString()];
+                                break;
+                            }
+                            currentType = currentType.BaseType;
+                        }
                     }
                     else
                         Debug.WriteLine($"Unknown type: {t} with kind {t.TypeKind} and special type {t.SpecialType}");
@@ -122,26 +129,6 @@ namespace HLNC.SourceGenerator
             }
 
             return new ExtendedVariantType { Type = propType, Subtype = subType };
-        }
-
-        // New helper method to get all base types and interfaces
-        private static IEnumerable<INamedTypeSymbol> GetAllBaseTypesAndInterfaces(ITypeSymbol type)
-        {
-            if (type == null) yield break;
-
-            var current = type as INamedTypeSymbol;
-            while (current != null)
-            {
-                yield return current;
-                
-                // Get interfaces for the current type
-                foreach (var iface in current.Interfaces)
-                {
-                    yield return iface;
-                }
-                
-                current = current.BaseType;
-            }
         }
 
         // Method to read a resource file
@@ -226,6 +213,8 @@ namespace HLNC.SourceGenerator
         // Method to execute the source generator
         public void Execute(GeneratorExecutionContext context)
         {
+            CollectObjectVariantTypes(context);
+
             var projectDir = "";
             context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.projectdir", out projectDir);
             projectDir = projectDir.Replace("\\", "/");
@@ -252,7 +241,14 @@ namespace HLNC.SourceGenerator
                 }
             }
 
-            context.AddSource($"NetworkScenesRegister.g.cs", Template.Parse(ReadResource("StaticSourceTemplate.sbncs")).Render(new { ScenesMap = ScenesMap.ToArray(), StaticNetworkNodesMap = StaticNetworkNodesMap.ToArray(), PropertiesMap, FunctionsMap }, member => member.Name));
+            context.AddSource($"NetworkScenesRegister.g.cs", Template.Parse(ReadResource("StaticSourceTemplate.sbncs"))
+                .Render(new {
+                    ScenesMap = ScenesMap.ToArray(),
+                    StaticNetworkNodesMap = StaticNetworkNodesMap.ToArray(),
+                    PropertiesMap = PropertiesMap.ToArray(),
+                    FunctionsMap = FunctionsMap.ToArray(),
+                    VariantSubtypes = VariantSubtypes.ToArray()
+                }, member => member.Name));
         }
 
         // Method to get network node classes
@@ -264,6 +260,7 @@ namespace HLNC.SourceGenerator
                     .Where(n => n is ClassDeclarationSyntax && IsNetworkNode(GetParentTypes(context, n as ClassDeclarationSyntax)))
                     .Select(n =>
                     {
+                        // The reason there are multiple ClassData objects is because of inheritance.
                         var types = GetParentTypes(context, n as ClassDeclarationSyntax);
                         var classes = types.Select(t =>
                         {
@@ -373,7 +370,7 @@ namespace HLNC.SourceGenerator
                     var networkSerializerName = "";
                     var bsonSerializerName = "";
                     var propType = GetVariantType(property.Type);
-                    propType.Subtype = GetAttributeArgument(property, "NetworkProperty", "Subtype", propType.Subtype);
+                    propType.Subtype = GetAttributeArgument(property, "NetworkProperty", "TypeIdentifier", propType.Subtype);
 
                     if (propType.Type == VariantType.Object)
                     {
@@ -401,8 +398,6 @@ namespace HLNC.SourceGenerator
                     var interestMask = GetAttributeArgument(property, "NetworkProperty", "InterestMask", -1L);
                     var interestMaskField = GetAttributeFieldValue(property, "NetworkProperty", "InterestMask");
 
-
-                    Debug.Print($"Property {sceneResourcePath} => {nodePath}.{property.Name} of type {propType.Type} with subtype {propType.Subtype} and interest mask {interestMask} and field value {interestMaskField}");
                     var propertyCollected = new CollectedNetworkProperty
                     {
                         BsonSerializerClass = bsonSerializerName,
@@ -410,7 +405,7 @@ namespace HLNC.SourceGenerator
                         NodePath = nodePath,
                         Name = property.Name,
                         Type = (int)propType.Type,
-                        Subtype = (int)propType.Subtype,
+                        Subtype = propType.Subtype,
                         InterestMask = interestMask == -1 ? interestMaskField : interestMask.ToString()
                     };
                     if (!result.Properties.ContainsKey(nodePath))
@@ -463,5 +458,60 @@ namespace HLNC.SourceGenerator
             // }
 #endif
         }
+
+        // Add this new method to collect ObjectVariant classes
+        private void CollectObjectVariantTypes(GeneratorExecutionContext context)
+        {
+            var assembly = context.Compilation.Assembly;
+            var objectVariantAttributes = assembly.GetAttributes()
+                .Where(attr => attr.AttributeClass?.Name == "VariantIdentifier");
+
+            foreach (var attribute in objectVariantAttributes)
+            {
+                if (attribute.ConstructorArguments.Length > 0 && 
+                    attribute.ConstructorArguments[0].Value is string variantId)
+                {
+                    var subtypeValue = VariantSubtypes.Count;
+                    if (!VariantSubtypes.ContainsKey(variantId))
+                    {
+                        VariantSubtypes.Add(variantId, subtypeValue);
+                    } else {
+                        throw new Exception($"Duplicate variant identifier: {variantId}");
+                    }
+                }
+            }
+        }
+
+
+        //         private void CollectObjectVariantTypes(GeneratorExecutionContext context)
+        // {
+        //     var classes = context.Compilation.SyntaxTrees
+        //         .SelectMany(st => st.GetRoot()
+        //             .DescendantNodes()
+        //             .OfType<ClassDeclarationSyntax>());
+
+        //     foreach (var classDeclaration in classes)
+        //     {
+        //         var semanticModel = context.Compilation.GetSemanticModel(classDeclaration.SyntaxTree);
+        //         var classSymbol = semanticModel.GetDeclaredSymbol(classDeclaration);
+
+        //         if (classSymbol == null) continue;
+
+        //         var objectVariantAttribute = classSymbol.GetAttributes()
+        //             .FirstOrDefault(attr => attr.AttributeClass?.Name == "ObjectVariant");
+
+        //         if (objectVariantAttribute != null)
+        //         {
+        //             var variantId = classSymbol.ToString().Replace(".", "_");
+        //             var subtypeValue = VariantSubtypes.Count + 1;
+
+        //             // Only add if not already present
+        //             if (!VariantSubtypes.ContainsKey(variantId))
+        //             {
+        //                 VariantSubtypes.Add(variantId, subtypeValue);
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
