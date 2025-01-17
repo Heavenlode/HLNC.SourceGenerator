@@ -111,11 +111,11 @@ namespace HLNC.SourceGenerator
                     else if (t.TypeKind == TypeKind.Class || t.TypeKind == TypeKind.Interface)
                     {
                         propType = VariantType.Object;
-                        // Check for VariantIdentifier attribute in the type and all its base types
+                        // Check for SerialTypeIdentifier attribute in the type and all its base types
                         var currentType = t;
                         while (currentType != null)
                         {
-                            var attribute = currentType.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "VariantIdentifier");
+                            var attribute = currentType.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "SerialTypeIdentifier");
                             if (attribute != null) {
                                 subType = VariantSubtypes[attribute.ConstructorArguments[0].Value.ToString()];
                                 break;
@@ -464,7 +464,7 @@ namespace HLNC.SourceGenerator
         {
             var assembly = context.Compilation.Assembly;
             var objectVariantAttributes = assembly.GetAttributes()
-                .Where(attr => attr.AttributeClass?.Name == "VariantIdentifier");
+                .Where(attr => attr.AttributeClass?.Name == "SerialTypeIdentifier");
 
             foreach (var attribute in objectVariantAttributes)
             {
