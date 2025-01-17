@@ -76,9 +76,9 @@ namespace HLNC.Serialization
                                                     {
                                                         return {{property.Value.NetworkSerializerClass}}.NetworkSerialize(currentWorld, peer, obj) as HLBuffer;
                                                     }),
-                                                    NetworkDeserialize = Callable.From((WorldRunner currentWorld, HLBuffer buffer, {{property.Value.NetworkSerializerClass}} obj) =>
+                                                    NetworkDeserialize = Callable.From((WorldRunner currentWorld, NetPeer peer, HLBuffer buffer, {{property.Value.NetworkSerializerClass}} obj) =>
                                                     {
-                                                        return {{property.Value.NetworkSerializerClass}}.NetworkDeserialize(currentWorld, buffer, obj);
+                                                        return {{property.Value.NetworkSerializerClass}}.NetworkDeserialize(currentWorld, peer, buffer, obj);
                                                     }),
                                                 {{ end }}
                                                 {{ if property.Value.BsonSerializerClass != "" }}
