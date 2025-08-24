@@ -1,3 +1,3 @@
 # HLNC.SourceGenerator
 
-This package is used alongside [HLNC](https://github.com/Heavenlode/HLNC), linking netcode to game resources. Further documentation is TODO.
+This package is now deprecated. Nebula (formerly HLNC) no longer uses source generation, rather preferring static Godot resource files
